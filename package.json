@@ -1,0 +1,126 @@
+{
+  "name": "rust-call-graph",
+  "displayName": "Rust Call Graph",
+  "description": "Explore source-backed Rust call and function-reference graphs inside VS Code.",
+  "version": "0.1.11",
+  "publisher": "rust-call-graph",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Jianqoq/rust-call-graph.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Jianqoq/rust-call-graph/issues"
+  },
+  "homepage": "https://github.com/Jianqoq/rust-call-graph#readme",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Visualization",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "rust",
+    "call graph",
+    "rust-analyzer",
+    "visualization"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "main": "./dist/extension.cjs",
+  "activationEvents": [
+    "onCommand:rustCallGraph.show"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "rustCallGraph.show",
+        "title": "Show Rust Call Graph",
+        "category": "Rust Call Graph",
+        "icon": "$(type-hierarchy)"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "rustCallGraph.show",
+          "when": "editorLangId == rust",
+          "group": "navigation@100"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Rust Call Graph",
+      "properties": {
+        "rustCallGraph.maxNodes": {
+          "type": "number",
+          "default": 250,
+          "minimum": 25,
+          "maximum": 2000,
+          "description": "Maximum number of nodes retained in one graph."
+        },
+        "rustCallGraph.expansionBatchSize": {
+          "type": "number",
+          "default": 50,
+          "minimum": 10,
+          "maximum": 200,
+          "description": "Maximum number of associated functions admitted by one Struct or Enum expansion."
+        },
+        "rustCallGraph.includeDependencies": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow graph expansion into standard-library and Cargo dependency source when available."
+        },
+        "rustCallGraph.refreshDebounceMs": {
+          "type": "number",
+          "default": 600,
+          "minimum": 100,
+          "maximum": 5000,
+          "description": "Delay before represented Rust documents are reanalyzed after an edit."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "build:extension": "esbuild src/extension/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.cjs --sourcemap",
+    "build:test-integration": "esbuild test/integration/index.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/test/integration.cjs",
+    "build:webview": "vite build",
+    "build": "pnpm clean && pnpm build:extension && pnpm build:webview",
+    "typecheck": "tsc -p tsconfig.extension.json --noEmit && tsc -p tsconfig.webview.json --noEmit && tsc -p tsconfig.integration.json --noEmit",
+    "test": "vitest run",
+    "test:integration": "pnpm build && pnpm build:test-integration && node scripts/run-integration.mjs",
+    "test:watch": "vitest",
+    "check": "pnpm typecheck && pnpm test && pnpm build",
+    "package": "pnpm check && vsce package --no-dependencies --allow-missing-repository",
+    "dev:webview": "vite",
+    "watch:extension": "esbuild src/extension/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.cjs --sourcemap --watch"
+  },
+  "dependencies": {
+    "@radix-ui/react-context-menu": "2.3.7",
+    "@xyflow/react": "12.11.3",
+    "lucide-react": "1.33.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@testing-library/react": "16.3.2",
+    "@types/node": "^26.0.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "@types/vscode": "1.96.0",
+    "@vitejs/plugin-react": "6.1.0",
+    "@vscode/test-electron": "3.1.0",
+    "@vscode/vsce": "3.9.2",
+    "esbuild": "0.28.2",
+    "jsdom": "30.0.1",
+    "tailwindcss": "4.3.3",
+    "typescript": "7.0.2",
+    "vite": "8.2.2",
+    "vitest": "4.1.11"
+  }
+}
