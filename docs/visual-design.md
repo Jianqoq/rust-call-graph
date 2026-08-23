@@ -12,6 +12,8 @@ Recent target ordering is independent of transient edge visibility. Pointer leav
 
 Edges are latent structure. The idle canvas communicates topology through node placement; hover and selection reveal only the relevant paths. Aggregate relationships always share the node's right-side origin, including during Source Expansion. A source highlight becomes a precise edge origin only while that exact Call Site or Function Reference is hovered or pinned, making the transition from text to graph feel mechanical and trustworthy. An exact pin owns visibility until dismissed or replaced, preventing the surrounding node hover from flooding the canvas with unrelated edges.
 
+Aggregate fan-out uses shared visual infrastructure rather than overpaint. Same-kind relationships leaving one node for one target column draw their common horizontal stem and vertical trunk exactly once, then separate into short target branches with individual arrowheads. Solid Call and dashed Reference trunks occupy adjacent lanes instead of merging; exact source-range edges remain singular so their source coordinates stay truthful.
+
 All edges live below Function and Type Nodes. An exact source endpoint can follow a scrolled Call Site or Function Reference, but the line is masked by the expanded node until it exits the node boundary; source text, the sticky legend, and node actions therefore remain visually uninterrupted.
 
 Source endpoints remain spatially honest when identifiers are wider than the node. The endpoint follows the identifier's right edge while visible, clamps to the Source Expansion's right boundary while the text overflows, and follows the text again as horizontal scrolling reveals its end.

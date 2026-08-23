@@ -8,6 +8,7 @@ import {
   ReactFlowProvider,
   useReactFlow,
   type Edge,
+  type EdgeTypes,
   type NodeChange,
   type NodeMouseHandler,
   type OnNodeDrag,
@@ -36,6 +37,8 @@ import {
 } from 'react';
 import type { GraphEdgeDto, GraphSnapshotDto, HostToWebviewMessage } from '../shared/protocol.js';
 import { bridge } from './bridge.js';
+import { BundledEdge } from './BundledEdge.js';
+import { bundleFanOutEdges, type FanOutEdgeCandidate } from './edgeBundling.js';
 import { edgeIsVisible, edgeSourceHandleId, nodeHoverEdgeTarget } from './edgeVisibility.js';
 import { directionIsActive, directionKey, visibleGraph } from './graphView.js';
 import type { BaseFlowNode, HoveredRelationship, NodeActions, RustFlowNode, SourceHoverData } from './graphTypes.js';
@@ -46,6 +49,9 @@ import { RustNode } from './RustNode.js';
 
 const nodeTypes: NodeTypes = {
   rustNode: RustNode as unknown as ComponentType<NodeProps>
+};
+const edgeTypes: EdgeTypes = {
+  bundled: BundledEdge
 };
 const INITIAL_READABLE_ZOOM = 0.7;
 
@@ -342,52 +348,95 @@ function GraphSurface() {
     });
   }, [actions, baseNodes, collapsedDirections, focusNodeId, graphView, hoveredRelationship, navigation.length, pinnedRelationship, recentRelationships, snapshot?.rootId, sourceHover]);
 
-  const edges = useMemo<Edge[]>(() => snapshot === undefined || graphView === undefined ? [] : graphView.edges.map(edge => {
-    const visible = edgeIsVisible(edge, {
-      hoveredNodeId,
-      hoveredEdgeId,
-      pinnedNodeId,
-      pinnedEdgeIds
+  const edges = useMemo<Edge[]>(() => {
+    if (snapshot === undefined || graphView === undefined) {
+      return [];
+    }
+    const geometry = new Map(nodes.map(node => {
+      const size = effectiveNodeSize(
+        node,
+        node.data.dto.kind === 'function' && node.data.dto.source !== undefined,
+        measuredSizes.current.get(node.id)
+      );
+      return [node.id, { position: node.position, size }] as const;
+    }));
+    const prepared = graphView.edges.map(edge => {
+      const visible = edgeIsVisible(edge, {
+        hoveredNodeId,
+        hoveredEdgeId,
+        pinnedNodeId,
+        pinnedEdgeIds
+      });
+      const anchored = sourceHasRelationship(snapshot, edge);
+      const exactSourceInteraction = hoveredEdgeId === edge.id || pinnedEdgeIds.has(edge.id);
+      const sourceHandle = edgeSourceHandleId(edge.id, anchored, exactSourceInteraction);
+      return { edge, visible, sourceHandle };
     });
-    const anchored = sourceHasRelationship(snapshot, edge);
-    const exactSourceInteraction = hoveredEdgeId === edge.id || pinnedEdgeIds.has(edge.id);
-    const color = edge.kind === 'reference'
-      ? 'var(--graph-reference)'
-      : edge.kind === 'membership'
-        ? 'var(--graph-membership)'
-        : 'var(--graph-call)';
-    return {
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      sourceHandle: edgeSourceHandleId(edge.id, anchored, exactSourceInteraction),
-      targetHandle: 'target',
-      type: 'smoothstep',
-      hidden: !visible,
-      selectable: false,
-      focusable: false,
-      interactionWidth: 16,
-      zIndex: 0,
-      ...(edge.kind === 'membership' ? {} : {
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          width: 18,
-          height: 18,
-          color
-        }
-      }),
-      style: {
-        stroke: color,
-        strokeWidth: edge.kind === 'membership' ? 1.4 : 2,
-        ...(edge.kind === 'reference'
-          ? { strokeDasharray: '7 5' }
-          : edge.kind === 'membership'
-            ? { strokeDasharray: '2 5' }
-            : {})
-      },
-      ariaLabel: `${edge.kind} from ${nodeLabel(snapshot, edge.source)} to ${nodeLabel(snapshot, edge.target)}`
-    };
-  }), [graphView, hoveredEdgeId, hoveredNodeId, pinnedEdgeIds, pinnedNodeId, snapshot]);
+    const bundleCandidates: FanOutEdgeCandidate[] = prepared.flatMap(({ edge, visible, sourceHandle }) => {
+      if (edge.kind === 'membership') {
+        return [];
+      }
+      const source = geometry.get(edge.source);
+      const target = geometry.get(edge.target);
+      if (source === undefined || target === undefined) {
+        return [];
+      }
+      return [{
+        id: edge.id,
+        sourceNodeId: edge.source,
+        sourceHandleId: sourceHandle,
+        kind: edge.kind,
+        visible,
+        sourceX: source.position.x + source.size.width,
+        sourceY: source.position.y + source.size.height / 2,
+        targetX: target.position.x,
+        targetY: target.position.y + target.size.height / 2,
+        targetColumnX: target.position.x
+      }];
+    });
+    const bundles = bundleFanOutEdges(bundleCandidates);
+
+    return prepared.map(({ edge, visible, sourceHandle }) => {
+      const color = edge.kind === 'reference'
+        ? 'var(--graph-reference)'
+        : edge.kind === 'membership'
+          ? 'var(--graph-membership)'
+          : 'var(--graph-call)';
+      const bundle = bundles.get(edge.id);
+      return {
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        sourceHandle,
+        targetHandle: 'target',
+        type: edge.kind === 'membership' ? 'smoothstep' : 'bundled',
+        hidden: !visible,
+        selectable: false,
+        focusable: false,
+        interactionWidth: 16,
+        zIndex: 0,
+        ...(bundle === undefined ? {} : { data: { bundle } }),
+        ...(edge.kind === 'membership' ? {} : {
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            width: 18,
+            height: 18,
+            color
+          }
+        }),
+        style: {
+          stroke: color,
+          strokeWidth: edge.kind === 'membership' ? 1.4 : 2,
+          ...(edge.kind === 'reference'
+            ? { strokeDasharray: '7 5' }
+            : edge.kind === 'membership'
+              ? { strokeDasharray: '2 5' }
+              : {})
+        },
+        ariaLabel: `${edge.kind} from ${nodeLabel(snapshot, edge.source)} to ${nodeLabel(snapshot, edge.target)}`
+      };
+    });
+  }, [graphView, hoveredEdgeId, hoveredNodeId, nodes, pinnedEdgeIds, pinnedNodeId, snapshot]);
 
   const onNodesChange = useCallback((changes: NodeChange<BaseFlowNode>[]) => {
     setBaseNodes(current => {
@@ -563,6 +612,7 @@ function GraphSurface() {
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         fitView
         onNodesChange={onNodesChange}
         onNodeDragStart={onNodeDragStart}

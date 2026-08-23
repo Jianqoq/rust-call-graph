@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.17
+
+- Aggregate fan-out Call Edges now share one rendered trunk per source and target column, eliminating the dark/bright bands caused by identical SVG segments being painted repeatedly.
+- Every relationship keeps its own target branch and arrowhead, while Call and Reference Edges use separate solid and dashed bundle lanes so their meanings remain distinct.
+- Exact Call Site and Function Reference interactions remain unbundled and continue to originate at the highlighted source identifier.
+
 ## 0.1.16
 
 - Horizontal node dragging now translates the entire originating grid column, including every node and row cell in it.

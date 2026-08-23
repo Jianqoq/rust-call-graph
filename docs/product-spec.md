@@ -44,6 +44,7 @@ The first release targets desktop VS Code and workspace extension hosts used by 
 
 - The idle graph has no visible arrows.
 - Hovering a node reveals all incident Call and Reference Edges.
+- Visible aggregate relationships with the same source, direction, kind, and target column share one rendered trunk. Each relationship retains its own target branch and arrowhead; Call and Reference Edges never share a trunk because their solid and dashed treatments carry different meaning.
 - Selecting a node pins its incident edges. Selecting a source relationship pins only that exact edge; selecting a different source relationship replaces the prior pinned edge and clears the prior graph-node selection. Selecting the same relationship again or pressing `Escape` dismisses it.
 - While an exact source relationship is pinned, aggregate Function Node hover is suppressed. Its target remains in its recent grid position after pointer leave. Hovering another exact source relationship temporarily adds only that edge and promotes its target to the nearest legal cell.
 - Expanding or collapsing Source on the pinned target preserves the exact edge and recent grid ordering while reflowing for the target's measured size. Collapsing the origin Source dismisses the pin because its Call Site or Function Reference is no longer visible.
@@ -111,3 +112,4 @@ The first release targets desktop VS Code and workspace extension hosts used by 
 23. Function Nodes do not render a signature-summary row between the header and actions; the function name, navigation controls, direction controls, and Source Expansion remain available.
 24. Source keywords remain visibly different from ordinary text when a theme assigns the same foreground to Explorer keyword icons and editor text; all syntax categories use a dedicated theme-aware source palette.
 25. Vertical header dragging cannot cross the column's outer row bounds and swaps the node onto a valid cell; horizontal header dragging moves every node and cell in the originating column by the same amount.
+26. Aggregate same-kind fan-out relationships into one target column render one shared trunk with one independent arrowed branch per target; exact source relationships and unlike Call/Reference styles are never merged.

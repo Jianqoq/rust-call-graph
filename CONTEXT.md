@@ -44,6 +44,10 @@ _Avoid_: dependency edge, usage edge
 A directed relationship from a Function Node or one of its Function References to the referenced Function Node.
 _Avoid_: call edge, import edge
 
+**Edge Bundle**:
+The visual routing of multiple same-kind aggregate edges through one shared source stem and target-column trunk while preserving a distinct branch and arrowhead for every relationship. Edge Bundling changes drawing, not graph identity.
+_Avoid_: merged relationship, combined call, duplicate edge
+
 **Source Expansion**:
 The read-only presentation of a Function Node's complete source definition inside that node, including source-backed Call Sites and Function References.
 _Avoid_: editor, source file, code preview
