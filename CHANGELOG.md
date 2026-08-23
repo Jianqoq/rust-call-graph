@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.18
+
+- A callee reached both directly from the Entry Function and from a second-column function now occupies the deeper acyclic call rank, so hovering it from second-level Source reorders the third column instead of the source column.
+- Preserved historical column coordinates can no longer collapse two different ranks onto the same x position; the deeper rank takes the next legal whole-column position.
+- Strongly connected call cycles remain bounded while deeper shared callees advance, preventing recursive relationships from drifting right on every layout pass.
+
 ## 0.1.17
 
 - Aggregate fan-out Call Edges now share one rendered trunk per source and target column, eliminating the dark/bright bands caused by identical SVG segments being painted repeatedly.

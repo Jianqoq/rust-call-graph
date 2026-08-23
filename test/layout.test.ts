@@ -96,6 +96,45 @@ describe('layoutGraph', () => {
     expect(layout.get('second')?.x).toBe(812);
   });
 
+  it('places a shared callee in the third column when it is called from a second-column source', () => {
+    const layered: GraphSnapshotDto = {
+      revision: 1,
+      rootId: 'root',
+      includeDependencies: false,
+      limits: { nodeCount: 5, maxNodes: 250, expansionBatchSize: 50, limitReached: false },
+      nodes: [node('root'), node('second-source'), node('second-peer'), node('shared-target'), node('third-peer')],
+      edges: [
+        { id: 'root-source', source: 'root', target: 'second-source', kind: 'call' },
+        { id: 'root-peer', source: 'root', target: 'second-peer', kind: 'call' },
+        { id: 'root-shared', source: 'root', target: 'shared-target', kind: 'call' },
+        { id: 'source-shared', source: 'second-source', target: 'shared-target', kind: 'call' },
+        { id: 'source-peer', source: 'second-source', target: 'third-peer', kind: 'call' }
+      ]
+    };
+
+    const layout = layoutGraph(layered, new Map([
+      ['root', { x: 0, y: 0 }],
+      ['second-source', { x: 549, y: 0 }],
+      ['second-peer', { x: 549, y: 183 }],
+      ['shared-target', { x: 549, y: 183 }]
+    ]));
+
+    expect(layout.get('shared-target')?.x).toBe(layout.get('third-peer')?.x);
+    expect(layout.get('shared-target')?.x).toBeGreaterThan(layout.get('second-source')?.x ?? 0);
+
+    const reordered = reorderRecentTargetsInGrid(
+      layered.nodes.map(item => ({
+        id: item.id,
+        position: layout.get(item.id) ?? { x: 0, y: 0 },
+        size: { width: 338, height: 112 }
+      })),
+      [{ originNodeId: 'second-source', targetNodeId: 'shared-target' }]
+    );
+    expect(reordered.get('shared-target')?.y).toBe(layout.get('third-peer')?.y);
+    expect(reordered.get('second-source')).toEqual(layout.get('second-source'));
+    expect(reordered.get('second-peer')).toEqual(layout.get('second-peer'));
+  });
+
   it('pushes same-column nodes down when source expands without moving adjacent columns', () => {
     const layout = makeRoomForExpandedSources([
       { id: 'expanded', position: { x: 0, y: 0 }, size: { width: 660, height: 560 } },

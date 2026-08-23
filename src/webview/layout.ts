@@ -46,8 +46,15 @@ export function layoutGraph(
   }
 
   const positions = new Map<string, Point>();
-  for (const [rank, ids] of groups) {
-    const columnX = previousColumnX(ids, previous, rank * COLUMN_GAP);
+  const occupiedColumnXs: number[] = [];
+  const orderedGroups = [...groups].sort(([left], [right]) =>
+    Math.abs(left) - Math.abs(right) || left - right
+  );
+  for (const [rank, ids] of orderedGroups) {
+    const fallbackX = rank * COLUMN_GAP;
+    const preferredX = previousColumnX(ids, previous, fallbackX);
+    const columnX = unoccupiedColumnX(preferredX, fallbackX, rank, occupiedColumnXs);
+    occupiedColumnXs.push(columnX);
     const availableRows = gridRows(ids.length);
     const rootIndex = ids.indexOf(snapshot.rootId);
     if (rootIndex !== -1) {
@@ -283,6 +290,23 @@ function previousColumnX(
   return groups[0]?.x ?? fallback;
 }
 
+function unoccupiedColumnX(
+  preferred: number,
+  fallback: number,
+  rank: number,
+  occupied: readonly number[]
+): number {
+  if (!occupied.some(columnX => sameColumn(columnX, preferred))) {
+    return preferred;
+  }
+  const step = rank < 0 ? -COLUMN_GAP : COLUMN_GAP;
+  let candidate = fallback;
+  while (occupied.some(columnX => sameColumn(columnX, candidate))) {
+    candidate += step;
+  }
+  return candidate;
+}
+
 function applyGridDrag(
   positions: ReadonlyMap<string, Point>,
   nodeId: string,
@@ -365,13 +389,13 @@ function pointKey(point: Point): string {
 }
 
 function discoverRanks(rootId: string, edges: readonly GraphEdgeDto[]): Map<string, number> {
+  const relationshipEdges = edges.filter(edge => edge.kind !== 'membership');
+  const components = stronglyConnectedComponents(rootId, relationshipEdges);
+  const rootComponent = components.byNode.get(rootId);
   const ranks = new Map<string, number>([[rootId, 0]]);
-  for (let pass = 0; pass < Math.max(2, edges.length); pass += 1) {
+  for (let pass = 0; pass < Math.max(2, relationshipEdges.length + 1); pass += 1) {
     let changed = false;
-    for (const edge of edges) {
-      if (edge.kind === 'membership') {
-        continue;
-      }
+    for (const edge of relationshipEdges) {
       const source = ranks.get(edge.source);
       const target = ranks.get(edge.target);
       if (source !== undefined && target === undefined) {
@@ -380,6 +404,22 @@ function discoverRanks(rootId: string, edges: readonly GraphEdgeDto[]): Map<stri
       } else if (target !== undefined && source === undefined) {
         ranks.set(edge.source, target - 1);
         changed = true;
+      } else if (
+        source !== undefined
+        && target !== undefined
+        && components.byNode.get(edge.source) !== components.byNode.get(edge.target)
+        && components.byNode.get(edge.target) !== rootComponent
+        && target < source + 1
+      ) {
+        const targetComponent = components.byNode.get(edge.target);
+        const delta = source + 1 - target;
+        for (const nodeId of targetComponent === undefined ? [] : components.members.get(targetComponent) ?? []) {
+          const current = ranks.get(nodeId);
+          if (current !== undefined) {
+            ranks.set(nodeId, current + delta);
+          }
+        }
+        changed = true;
       }
     }
     if (!changed) {
@@ -387,6 +427,78 @@ function discoverRanks(rootId: string, edges: readonly GraphEdgeDto[]): Map<stri
     }
   }
   return ranks;
+}
+
+function stronglyConnectedComponents(
+  rootId: string,
+  edges: readonly GraphEdgeDto[]
+): {
+  readonly byNode: ReadonlyMap<string, number>;
+  readonly members: ReadonlyMap<number, readonly string[]>;
+} {
+  const adjacency = new Map<string, string[]>();
+  const nodeIds = new Set<string>([rootId]);
+  for (const edge of edges) {
+    nodeIds.add(edge.source);
+    nodeIds.add(edge.target);
+    const targets = adjacency.get(edge.source) ?? [];
+    targets.push(edge.target);
+    adjacency.set(edge.source, targets);
+  }
+
+  let nextIndex = 0;
+  let nextComponent = 0;
+  const stack: string[] = [];
+  const onStack = new Set<string>();
+  const indices = new Map<string, number>();
+  const lowLinks = new Map<string, number>();
+  const byNode = new Map<string, number>();
+  const members = new Map<number, string[]>();
+
+  const visit = (nodeId: string): void => {
+    const index = nextIndex;
+    nextIndex += 1;
+    indices.set(nodeId, index);
+    lowLinks.set(nodeId, index);
+    stack.push(nodeId);
+    onStack.add(nodeId);
+
+    for (const targetId of adjacency.get(nodeId) ?? []) {
+      if (!indices.has(targetId)) {
+        visit(targetId);
+        lowLinks.set(nodeId, Math.min(lowLinks.get(nodeId) ?? index, lowLinks.get(targetId) ?? index));
+      } else if (onStack.has(targetId)) {
+        lowLinks.set(nodeId, Math.min(lowLinks.get(nodeId) ?? index, indices.get(targetId) ?? index));
+      }
+    }
+
+    if (lowLinks.get(nodeId) !== indices.get(nodeId)) {
+      return;
+    }
+    const componentId = nextComponent;
+    nextComponent += 1;
+    const componentMembers: string[] = [];
+    while (stack.length > 0) {
+      const member = stack.pop();
+      if (member === undefined) {
+        break;
+      }
+      onStack.delete(member);
+      byNode.set(member, componentId);
+      componentMembers.push(member);
+      if (member === nodeId) {
+        break;
+      }
+    }
+    members.set(componentId, componentMembers);
+  };
+
+  for (const nodeId of nodeIds) {
+    if (!indices.has(nodeId)) {
+      visit(nodeId);
+    }
+  }
+  return { byNode, members };
 }
 
 function typeRank(typeId: string, edges: readonly GraphEdgeDto[], ranks: ReadonlyMap<string, number>): number {
