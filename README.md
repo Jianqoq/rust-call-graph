@@ -23,7 +23,6 @@ Rust Call Graph is a source-backed, interactive call graph for Rust workspaces i
 - Right-click any node and choose **Open Source in VS Code** to open its definition.
 - Expand Struct and Enum methods progressively without duplicating cyclic nodes.
 - The compact layout uses half the earlier horizontal and vertical whitespace. Nodes occupy shared, horizontally movable rank columns with bounded row cells; hover recency permutes cells vertically without creating free-form coordinates. Source Expansion can shift a complete right-hand column to prevent overlap and restores the grid when collapsed.
-- Shared callees use their deepest acyclic outgoing rank. Consequently, hovering a relationship in a second-column Source reorders only its third-column targets, even when one target was already visible through a direct Entry Function call.
 
 ## Requirements
 
