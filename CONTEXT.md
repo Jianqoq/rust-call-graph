@@ -53,7 +53,7 @@ A relationship deliberately kept visible after its node or source range is selec
 _Avoid_: permanent edge, selected node
 
 **Recent Target**:
-A Function Node most recently reached by hovering or selecting a Call Site or Function Reference. Within its existing rank column, newer Recent Targets occupy cells closer to the source and older ones progressively farther away.
+A Function Node most recently reached by hovering or selecting a Call Site or Function Reference. Within its shared rank column, newer Recent Targets occupy cells closer to the source and older ones progressively farther away; manually translating that column carries every Recent Target with it.
 _Avoid_: inspection slot, floating target, temporary node
 
 **Graph Focus**:

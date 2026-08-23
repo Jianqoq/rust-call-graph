@@ -4,7 +4,7 @@ The graph should feel like an instrument panel for reading code, not a diagram e
 
 Color carries relationship kind but never carries it alone. Calls use a solid treatment, references a dashed treatment, and structural/type information a quieter neutral treatment. All colors derive from VS Code semantic tokens so the composition belongs naturally to the user's current theme, including high contrast.
 
-The Entry Function is visually anchored without becoming oversized. Incoming nodes occupy compact fixed columns to the left and outgoing nodes to the right; horizontal and vertical whitespace is half the original rhythm while node size and typography remain unchanged. Each column is a bounded stack of row cells. Hovering a source relationship promotes its target to the closest cell in its existing column; each later hover becomes the new nearest target while prior targets move progressively farther, creating a quiet spatial history without free-form drift. When source expands a node, measured collision space opens locally and complete right-hand columns shift just beyond its width; collapse returns neighbors to the grid.
+The Entry Function is visually anchored without becoming oversized. Incoming nodes occupy compact shared columns to the left and outgoing nodes to the right; horizontal and vertical whitespace is half the original rhythm while node size and typography remain unchanged. Each column is a horizontally movable, bounded stack of row cells. Hovering a source relationship promotes its target to the closest cell in its existing column; each later hover becomes the new nearest target while prior targets move progressively farther, creating a quiet spatial history without free-form drift. When source expands a node, measured collision space opens locally and complete right-hand columns shift just beyond its width; collapse returns neighbors to the grid.
 
 Collapsed Function Nodes avoid repeating their full signature. The header carries function identity and optional navigation, followed immediately by the compact direction and Source controls; full code belongs to Source Expansion.
 
@@ -22,7 +22,7 @@ Syntax color uses a layered model: rust-analyzer semantic tokens own known range
 
 Motion is brief, functional, and optional. Focus transitions clarify where navigation landed, while reduced-motion mode replaces them with immediate positioning. Focus rings, labels, line patterns, and shape ensure every interaction remains understandable without animation or color.
 
-Dragging is a header-level affordance rather than a property of every node surface. The header uses `grab`/`grabbing`; movement is vertical-only inside the current column's outer rows and snaps onto legal cells at release. Node content stays visually neutral, source reads as selectable text, and actionable controls keep the pointer cursor.
+Dragging is a header-level affordance rather than a property of every node surface. The header uses `grab`/`grabbing`; vertical intent swaps the node inside the current column's bounded rows, while horizontal intent carries the whole column and all of its cells. Node content stays visually neutral, source reads as selectable text, and actionable controls keep the pointer cursor.
 
 Direction controls are deliberately quiet: **in** and **out** are lower-case text without directional icons. Their filled active state communicates that a branch is present on the canvas; the same state is exposed with `aria-pressed`.
 

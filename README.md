@@ -5,7 +5,7 @@ Rust Call Graph is a source-backed, interactive call graph for Rust workspaces i
 ## First-release interactions
 
 - Right-click inside a Rust function and choose **Show Rust Call Graph**.
-- Drag a Function, Struct, or Enum Node from its header. Dragging is vertical-only inside the node's existing column and bounded by that column's outer rows; release snaps the ordering back onto legal grid cells. Node bodies retain the normal cursor, Source Expansion uses the text cursor, and interactive controls keep the pointer cursor.
+- Drag a Function, Struct, or Enum Node from its header. Vertical movement swaps that node into a bounded row cell; horizontal movement translates its entire grid column, including every node and cell in that column. Node bodies retain the normal cursor, Source Expansion uses the text cursor, and interactive controls keep the pointer cursor.
 - Collapsed Function Nodes show only their type/name header and **in**/**Source**/**out** controls; the redundant one-line signature preview is omitted.
 - Hover any node to reveal its incident calls and function references from the node endpoint.
 - Click the lower-case **in** or **out** button to show every direct caller or callee up to the graph limit; the highlighted button is on, and a second click removes that direction from the canvas without discarding its cached analysis.
@@ -21,7 +21,7 @@ Rust Call Graph is a source-backed, interactive call graph for Rust workspaces i
 - Double-click a highlighted source relationship to focus its target; use **Back** on the target node to return.
 - Right-click any node and choose **Open Source in VS Code** to open its definition.
 - Expand Struct and Enum methods progressively without duplicating cyclic nodes.
-- The compact layout uses half the earlier horizontal and vertical whitespace. Nodes occupy fixed rank columns and bounded row cells; hover recency permutes cells vertically without creating free-form coordinates. Source Expansion can shift a complete right-hand column to prevent overlap and restores the grid when collapsed.
+- The compact layout uses half the earlier horizontal and vertical whitespace. Nodes occupy shared, horizontally movable rank columns with bounded row cells; hover recency permutes cells vertically without creating free-form coordinates. Source Expansion can shift a complete right-hand column to prevent overlap and restores the grid when collapsed.
 
 ## Requirements
 

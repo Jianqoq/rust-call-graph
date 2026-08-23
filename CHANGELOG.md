@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.16
+
+- Horizontal node dragging now translates the entire originating grid column, including every node and row cell in it.
+- Vertical dragging swaps the selected node with the nearest legal row occupant while preserving focus and exact relationship pinning.
+- Drag start commits the visible recent-target ordering before manual movement, so automatic recency no longer pulls a focused node back to its prior cell.
+- React Flow's trailing `dragging:false` position update now inherits the completed grid coordinates instead of restoring a free-form expanded-source offset.
+
 ## 0.1.15
 
 - Function and Type Nodes now occupy fixed rank columns and bounded vertical grid cells instead of free-form inspection coordinates.

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GraphSnapshotDto } from '../src/shared/protocol.js';
-import { gridColumnExtent, layoutGraph, makeRoomForExpandedSources, reorderRecentTargetsInGrid } from '../src/webview/layout.js';
+import { finishGridDrag, layoutGraph, makeRoomForExpandedSources, previewGridDrag, reorderRecentTargetsInGrid } from '../src/webview/layout.js';
 
 const position = { line: 0, character: 0 };
 const range = { start: position, end: position };
@@ -48,11 +48,11 @@ describe('layoutGraph', () => {
     expect(layout.size).toBe(4);
   });
 
-  it('normalizes saved positions back into fixed graph columns and rows', () => {
+  it('normalizes saved positions into rows while preserving a moved column x', () => {
     const manual = new Map([['root', { x: 137, y: 91 }]]);
     const layout = layoutGraph(snapshot(), manual);
-    expect(layout.get('root')).toEqual({ x: 0, y: 0 });
-    expect([...layout.values()].every(point => point.x % 549 === 0 && point.y % 183 === 0)).toBe(true);
+    expect(layout.get('root')).toEqual({ x: 137, y: 0 });
+    expect([...layout.values()].every(point => point.y % 183 === 0)).toBe(true);
   });
 
   it('uses half-size horizontal and vertical whitespace between collapsed nodes', () => {
@@ -70,6 +70,30 @@ describe('layoutGraph', () => {
     const layout = layoutGraph(compact, new Map());
     expect((layout.get('first')?.x ?? 0) - (layout.get('root')?.x ?? 0)).toBe(549);
     expect(Math.abs((layout.get('second')?.y ?? 0) - (layout.get('first')?.y ?? 0))).toBe(183);
+  });
+
+  it('preserves one shared x for every node in a horizontally moved rank column', () => {
+    const compact: GraphSnapshotDto = {
+      revision: 1,
+      rootId: 'root',
+      includeDependencies: false,
+      limits: { nodeCount: 3, maxNodes: 250, expansionBatchSize: 50, limitReached: false },
+      nodes: [node('root'), node('first'), node('second')],
+      edges: [
+        { id: 'first-edge', source: 'root', target: 'first', kind: 'call' },
+        { id: 'second-edge', source: 'root', target: 'second', kind: 'call' }
+      ]
+    };
+    const moved = new Map([
+      ['root', { x: 0, y: 0 }],
+      ['first', { x: 812, y: -183 }],
+      ['second', { x: 812, y: 183 }]
+    ]);
+
+    const layout = layoutGraph(compact, moved);
+
+    expect(layout.get('first')?.x).toBe(812);
+    expect(layout.get('second')?.x).toBe(812);
   });
 
   it('pushes same-column nodes down when source expands without moving adjacent columns', () => {
@@ -145,17 +169,33 @@ describe('layoutGraph', () => {
     expect(Math.max(...[...layout.values()].map(point => point.y))).toBe(366);
   });
 
-  it('locks a node top-left to its column without clipping its own dimensions', () => {
+  it('moves every cell in a column together during horizontal drag', () => {
     const positions = new Map([
       ['top', { x: 710, y: -183 }],
-      ['middle', { x: 710, y: 0 }],
+      ['focused', { x: 710, y: 0 }],
       ['bottom', { x: 710, y: 183 }],
-      ['other-column', { x: 1259, y: 500 }]
+      ['other-column', { x: 1259, y: 0 }]
     ]);
 
-    expect(gridColumnExtent(positions, positions.get('middle')!, { width: 338, height: 120 })).toEqual([
-      [710, -183],
-      [1048, 303]
+    const preview = previewGridDrag(positions, 'focused', { x: 710, y: 0 }, { x: 900, y: 420 });
+
+    expect(preview.get('top')).toEqual({ x: 900, y: -183 });
+    expect(preview.get('focused')).toEqual({ x: 900, y: 183 });
+    expect(preview.get('bottom')).toEqual({ x: 900, y: 183 });
+    expect(preview.get('other-column')).toEqual({ x: 1259, y: 0 });
+  });
+
+  it('swaps a focused node into the nearest row cell when vertical drag ends', () => {
+    const positions = new Map([
+      ['top', { x: 710, y: -183 }],
+      ['focused', { x: 710, y: 0 }],
+      ['bottom', { x: 710, y: 183 }]
     ]);
+
+    const completed = finishGridDrag(positions, 'focused', { x: 710, y: 0 }, { x: 710, y: 170 });
+
+    expect(completed.get('top')).toEqual({ x: 710, y: -183 });
+    expect(completed.get('focused')).toEqual({ x: 710, y: 183 });
+    expect(completed.get('bottom')).toEqual({ x: 710, y: 0 });
   });
 });

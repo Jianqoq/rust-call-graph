@@ -21,11 +21,9 @@ export interface InspectionRelationship {
   readonly targetNodeId: string;
 }
 
-export type GridExtent = [[number, number], [number, number]];
-
 // A collapsed Function Node is 338px wide and about 112px high. Nodes occupy
-// fixed rank columns and bounded row cells; interaction may permute which node
-// owns a cell but never invents a free-form inspection coordinate.
+// shared rank columns and bounded row cells; interaction may permute which node
+// owns a cell or translate an entire column but never moves one cell sideways.
 const COLUMN_GAP = 549;
 const ROW_GAP = 183;
 const SOURCE_HORIZONTAL_CLEARANCE = 50;
@@ -49,10 +47,11 @@ export function layoutGraph(
 
   const positions = new Map<string, Point>();
   for (const [rank, ids] of groups) {
+    const columnX = previousColumnX(ids, previous, rank * COLUMN_GAP);
     const availableRows = gridRows(ids.length);
     const rootIndex = ids.indexOf(snapshot.rootId);
     if (rootIndex !== -1) {
-      positions.set(snapshot.rootId, { x: rank * COLUMN_GAP, y: 0 });
+      positions.set(snapshot.rootId, { x: columnX, y: 0 });
       availableRows.splice(availableRows.indexOf(0), 1);
     }
 
@@ -63,7 +62,7 @@ export function layoutGraph(
       const desiredY = previous.get(id)?.y ?? 0;
       const rowIndex = nearestRowIndex(availableRows, desiredY);
       const [y = 0] = availableRows.splice(rowIndex, 1);
-      positions.set(id, { x: rank * COLUMN_GAP, y });
+      positions.set(id, { x: columnX, y });
     }
   }
   return positions;
@@ -217,22 +216,27 @@ export function reorderRecentTargetsInGrid(
 }
 
 /**
- * React Flow constrains the entire node rectangle, so the maximum boundary
- * includes the node's own width and height. This locks its top-left x to the
- * current column while allowing y only inside that column's rendered rows.
+ * Previews a header drag. Horizontal movement translates the whole originating
+ * column to the pointer's rendered x. Vertical movement affects only the
+ * dragged node and is clamped to the column's outer row cells.
  */
-export function gridColumnExtent(
+export function previewGridDrag(
   positions: ReadonlyMap<string, Point>,
-  position: Point,
-  size: Size
-): GridExtent {
-  const rows = [...positions.values()]
-    .filter(point => sameColumn(point.x, position.x))
-    .map(point => point.y);
-  return [
-    [position.x, Math.min(...rows, position.y)],
-    [position.x + size.width, Math.max(...rows, position.y) + size.height]
-  ];
+  nodeId: string,
+  renderedStart: Point,
+  renderedPosition: Point
+): ReadonlyMap<string, Point> {
+  return applyGridDrag(positions, nodeId, renderedStart, renderedPosition, false);
+}
+
+/** Finishes a header drag by swapping the node into the nearest legal row. */
+export function finishGridDrag(
+  positions: ReadonlyMap<string, Point>,
+  nodeId: string,
+  renderedStart: Point,
+  renderedPosition: Point
+): ReadonlyMap<string, Point> {
+  return applyGridDrag(positions, nodeId, renderedStart, renderedPosition, true);
 }
 
 function horizontalBandsOverlap(left: LayoutBox, right: LayoutBox): boolean {
@@ -249,6 +253,79 @@ function gridRows(count: number): number[] {
     }
   }
   return rows;
+}
+
+function previousColumnX(
+  ids: readonly string[],
+  previous: ReadonlyMap<string, Point>,
+  fallback: number
+): number {
+  const candidates = ids
+    .map(id => previous.get(id)?.x)
+    .filter((x): x is number => x !== undefined);
+  if (candidates.length === 0) {
+    return fallback;
+  }
+  const groups: Array<{ x: number; count: number }> = [];
+  for (const x of candidates) {
+    const group = groups.find(candidate => sameColumn(candidate.x, x));
+    if (group === undefined) {
+      groups.push({ x, count: 1 });
+    } else {
+      group.count += 1;
+    }
+  }
+  groups.sort((left, right) =>
+    right.count - left.count
+    || Math.abs(left.x - fallback) - Math.abs(right.x - fallback)
+    || left.x - right.x
+  );
+  return groups[0]?.x ?? fallback;
+}
+
+function applyGridDrag(
+  positions: ReadonlyMap<string, Point>,
+  nodeId: string,
+  renderedStart: Point,
+  renderedPosition: Point,
+  finish: boolean
+): ReadonlyMap<string, Point> {
+  const origin = positions.get(nodeId);
+  if (origin === undefined) {
+    return new Map(positions);
+  }
+  const column = [...positions.entries()]
+    .filter(([, position]) => sameColumn(position.x, origin.x));
+  const rows = column.map(([, position]) => position.y).sort((left, right) => left - right);
+  const desiredY = origin.y + renderedPosition.y - renderedStart.y;
+  const clampedY = Math.max(rows[0] ?? origin.y, Math.min(rows.at(-1) ?? origin.y, desiredY));
+  const horizontalDelta = renderedPosition.x - renderedStart.x;
+  // When Source Expansion has shifted a column temporarily, renderedStart.x
+  // differs from its baseline x. The first intentional horizontal movement
+  // therefore adopts the rendered x directly instead of applying that offset
+  // twice or making the column jump.
+  const columnX = Math.abs(horizontalDelta) < 0.5 ? origin.x : renderedPosition.x;
+  const result = new Map(positions);
+  for (const [id, position] of column) {
+    result.set(id, { x: columnX, y: position.y });
+  }
+
+  if (!finish) {
+    result.set(nodeId, { x: columnX, y: clampedY });
+    return result;
+  }
+
+  const targetY = rows.reduce((nearest, row) =>
+    Math.abs(row - clampedY) < Math.abs(nearest - clampedY)
+      || (Math.abs(row - clampedY) === Math.abs(nearest - clampedY) && row < nearest)
+      ? row
+      : nearest, rows[0] ?? origin.y);
+  const occupant = column.find(([id, position]) => id !== nodeId && Math.abs(position.y - targetY) < 0.5);
+  result.set(nodeId, { x: columnX, y: targetY });
+  if (occupant !== undefined) {
+    result.set(occupant[0], { x: columnX, y: origin.y });
+  }
+  return result;
 }
 
 function compareByPreviousPosition(left: string, right: string, previous: ReadonlyMap<string, Point>): number {

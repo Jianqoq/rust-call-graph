@@ -40,7 +40,7 @@ import { edgeIsVisible, edgeSourceHandleId, nodeHoverEdgeTarget } from './edgeVi
 import { directionIsActive, directionKey, visibleGraph } from './graphView.js';
 import type { BaseFlowNode, HoveredRelationship, NodeActions, RustFlowNode, SourceHoverData } from './graphTypes.js';
 import { activeInspectionRelationships, clearNodeSelection, nextPinnedRelationship, pinnedRelationshipAfterSourceToggle, promoteRecentRelationship } from './interactionState.js';
-import { gridColumnExtent, layoutGraph, makeRoomForExpandedSources, reorderRecentTargetsInGrid, type Point, type Size } from './layout.js';
+import { finishGridDrag, layoutGraph, makeRoomForExpandedSources, previewGridDrag, reorderRecentTargetsInGrid, type Point, type Size } from './layout.js';
 import { NODE_INTERACTION } from './nodeInteraction.js';
 import { RustNode } from './RustNode.js';
 
@@ -52,6 +52,18 @@ const INITIAL_READABLE_ZOOM = 0.7;
 interface NavigationEntry {
   readonly nodeId: string;
   readonly viewport: Viewport;
+}
+
+interface GridDragSession {
+  readonly nodeId: string;
+  readonly renderedStart: Point;
+  readonly initialPositions: ReadonlyMap<string, Point>;
+  renderedPosition: Point;
+}
+
+interface CompletedGridDrag {
+  readonly nodeId: string;
+  readonly positions: ReadonlyMap<string, Point>;
 }
 
 export function App() {
@@ -83,6 +95,8 @@ function GraphSurface() {
   const baselinePositions = useRef(new Map<string, Point>());
   const measuredSizes = useRef(new Map<string, Size>());
   const expandedSourceIds = useRef<ReadonlySet<string>>(new Set());
+  const gridDragSession = useRef<GridDragSession | undefined>(undefined);
+  const completedGridDrag = useRef<CompletedGridDrag | undefined>(undefined);
   const reducedMotion = useReducedMotion();
   const pinnedEdgeIds = useMemo<ReadonlySet<string>>(
     () => pinnedRelationship === undefined ? new Set() : new Set([pinnedRelationship.edgeId]),
@@ -306,16 +320,13 @@ function GraphSurface() {
       .map(box => box.id));
     const positions = makeRoomForExpandedSources(reorderedBoxes, visibleExpandedIds);
     const inspectionTargetIds = new Set(inspectionRelationships.map(relationship => relationship.targetNodeId));
-    const sizes = new Map(reorderedBoxes.map(box => [box.id, box.size]));
 
     return visibleBaseNodes.map(node => {
       const dto = node.data.dto;
       const position = positions.get(node.id) ?? node.position;
-      const size = sizes.get(node.id) ?? { width: 338, height: 120 };
       return {
         ...node,
         position,
-        extent: gridColumnExtent(positions, position, size),
         data: {
           ...node.data,
           root: node.id === snapshot?.rootId,
@@ -380,30 +391,58 @@ function GraphSurface() {
 
   const onNodesChange = useCallback((changes: NodeChange<BaseFlowNode>[]) => {
     setBaseNodes(current => {
-      const canonicalGrid = snapshot === undefined ? undefined : layoutGraph(snapshot, new Map());
-      const constrainedChanges = changes.map(change => {
-        if (change.type !== 'position' || change.position === undefined) {
-          return change;
-        }
-        const baseline = baselinePositions.current.get(change.id) ?? change.position;
-        const bounds = canonicalGrid === undefined
-          ? undefined
-          : columnYBounds(canonicalGrid, canonicalGrid.get(change.id)?.x ?? baseline.x);
-        return {
-          ...change,
-          position: {
-            x: baseline.x,
-            y: bounds === undefined
-              ? change.position.y
-              : Math.max(bounds.min, Math.min(bounds.max, change.position.y))
-          }
-        };
-      });
-      const next = applyNodeChanges(constrainedChanges, current);
+      const session = gridDragSession.current;
+      const completed = completedGridDrag.current;
+      const draggedPosition = session === undefined
+        ? undefined
+        : changes.find(change =>
+          change.type === 'position'
+          && change.id === session.nodeId
+          && change.position !== undefined
+        );
+      const completedPosition = completed === undefined
+        ? undefined
+        : changes.find(change =>
+          change.type === 'position'
+          && change.id === completed.nodeId
+          && change.position !== undefined
+          && change.dragging === false
+        );
+      const normalizedChanges = completedPosition === undefined || completed === undefined
+        ? changes
+        : changes.map(change => change.type === 'position'
+          && change.id === completed.nodeId
+          && change.position !== undefined
+          && change.dragging === false
+          ? { ...change, position: completed.positions.get(change.id) ?? change.position }
+          : change);
+      let next = applyNodeChanges(normalizedChanges, current);
 
-      for (const change of constrainedChanges) {
-        if (change.type === 'position' && change.position !== undefined) {
-          baselinePositions.current.set(change.id, change.position);
+      if (completed !== undefined && completedPosition !== undefined) {
+        replacePositions(baselinePositions.current, completed.positions);
+        next = next.map(node => ({
+          ...node,
+          position: completed.positions.get(node.id) ?? node.position
+        }));
+        completedGridDrag.current = undefined;
+      } else if (session !== undefined && draggedPosition?.type === 'position' && draggedPosition.position !== undefined) {
+        session.renderedPosition = draggedPosition.position;
+        const preview = previewGridDrag(
+          session.initialPositions,
+          session.nodeId,
+          session.renderedStart,
+          draggedPosition.position
+        );
+        replacePositions(baselinePositions.current, preview);
+        next = next.map(node => ({
+          ...node,
+          position: preview.get(node.id) ?? node.position
+        }));
+      } else if (session === undefined && completed === undefined) {
+        for (const change of changes) {
+          if (change.type === 'position' && change.position !== undefined) {
+            baselinePositions.current.set(change.id, change.position);
+          }
         }
       }
 
@@ -418,24 +457,66 @@ function GraphSurface() {
 
       return next;
     });
-  }, [snapshot]);
+  }, []);
+
+  const onNodeDragStart: OnNodeDrag<RustFlowNode> = useCallback((_, node) => {
+    const visibleBaseNodes = baseNodes.filter(candidate => graphView?.nodeIds.has(candidate.id) === true);
+    const boxes = visibleBaseNodes.map(candidate => ({
+      id: candidate.id,
+      position: baselinePositions.current.get(candidate.id) ?? candidate.position,
+      size: effectiveNodeSize(
+        candidate,
+        candidate.data.dto.kind === 'function' && candidate.data.dto.source !== undefined,
+        measuredSizes.current.get(candidate.id)
+      )
+    }));
+    const committedRecent = reorderRecentTargetsInGrid(boxes, recentRelationships);
+    const initialPositions = new Map(baselinePositions.current);
+    for (const [id, position] of committedRecent) {
+      initialPositions.set(id, position);
+    }
+    replacePositions(baselinePositions.current, initialPositions);
+    setBaseNodes(current => current.map(candidate => ({
+      ...candidate,
+      position: initialPositions.get(candidate.id) ?? candidate.position
+    })));
+    setRecentRelationships([]);
+    completedGridDrag.current = undefined;
+    gridDragSession.current = {
+      nodeId: node.id,
+      renderedStart: node.position,
+      initialPositions,
+      renderedPosition: node.position
+    };
+  }, [baseNodes, graphView?.nodeIds, recentRelationships]);
 
   const onNodeDragStop: OnNodeDrag<RustFlowNode> = useCallback(() => {
-    if (snapshot === undefined) {
+    const session = gridDragSession.current;
+    if (session === undefined) {
       return;
     }
-    setBaseNodes(current => {
-      const snapped = layoutGraph(snapshot, baselinePositions.current);
-      baselinePositions.current.clear();
-      for (const [id, position] of snapped) {
-        baselinePositions.current.set(id, position);
+    const completed = finishGridDrag(
+      session.initialPositions,
+      session.nodeId,
+      session.renderedStart,
+      session.renderedPosition
+    );
+    replacePositions(baselinePositions.current, completed);
+    const pendingCompletion = { nodeId: session.nodeId, positions: completed };
+    completedGridDrag.current = pendingCompletion;
+    gridDragSession.current = undefined;
+    window.setTimeout(() => {
+      if (completedGridDrag.current === pendingCompletion) {
+        completedGridDrag.current = undefined;
       }
+    }, 0);
+    setBaseNodes(current => {
       return current.map(node => ({
         ...node,
-        position: snapped.get(node.id) ?? node.position
+        position: completed.get(node.id) ?? node.position
       }));
     });
-  }, [snapshot]);
+  }, []);
 
   const onNodeClick: NodeMouseHandler<RustFlowNode> = useCallback((event, node) => {
     if ((event.target as HTMLElement).closest('button,[role="menuitem"]') !== null) {
@@ -484,6 +565,7 @@ function GraphSurface() {
         nodeTypes={nodeTypes}
         fitView
         onNodesChange={onNodesChange}
+        onNodeDragStart={onNodeDragStart}
         onNodeDragStop={onNodeDragStop}
         onNodeClick={onNodeClick}
         onNodeDoubleClick={onNodeDoubleClick}
@@ -627,17 +709,14 @@ function persistView(
   });
 }
 
-function columnYBounds(
-  positions: ReadonlyMap<string, Point>,
-  x: number
-): { readonly min: number; readonly max: number } | undefined {
-  const rows = [...positions.values()]
-    .filter(position => Math.abs(position.x - x) < 0.5)
-    .map(position => position.y);
-  if (rows.length === 0) {
-    return undefined;
+function replacePositions(
+  target: Map<string, Point>,
+  source: ReadonlyMap<string, Point>
+): void {
+  target.clear();
+  for (const [id, position] of source) {
+    target.set(id, position);
   }
-  return { min: Math.min(...rows), max: Math.max(...rows) };
 }
 
 function sourceHasRelationship(snapshot: GraphSnapshotDto, edge: GraphEdgeDto): boolean {
