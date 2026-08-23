@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.12
+
+- Pinned and hovered source edges now render below Function Nodes, so scrolling keeps their exact endpoint aligned without drawing the routed line over Source Expansion, node actions, or other node UI.
+- Source Expansion now supplements rust-analyzer semantic tokens with a Rust lexical color fallback for keywords, booleans, numbers, strings, comments, lifetimes, and character literals that the provider omits.
+- Provider semantic tokens remain authoritative wherever they overlap the lexical fallback.
+
 ## 0.1.11
 
 - Node dragging is now limited to the node header instead of turning every hovered node surface into a drag affordance.

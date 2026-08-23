@@ -5,11 +5,11 @@ Verified on 2026-08-23 against VS Code 1.133.0 and rust-analyzer 0.3.3016.
 ## Automated
 
 - `pnpm typecheck` — extension host, Webview, and integration-test TypeScript pass in strict mode.
-- `pnpm test` — 37 unit tests cover Struct/Enum scanning, trait and generic impl association, compact graph spacing, stable graph layout, cycles, manual-position preservation, expanded-source horizontal/vertical collision reflow and restoration, hovered and pinned inspection-slot layout, target-source focus preservation, origin-source focus dismissal, long-name source-handle clamping, delayed language-hover requests, safe hover-card rendering, direction branch visibility with shared-node retention, exact-pin suppression of aggregate node hover, exclusive relationship pinning, qualified-path range narrowing and icon-free source rendering, semantic source token segmentation, aggregate-versus-exact source endpoint selection, multiple source call sites, and header-only node dragging.
+- `pnpm test` — 41 unit tests cover Struct/Enum scanning, trait and generic impl association, compact graph spacing, stable graph layout, cycles, manual-position preservation, expanded-source horizontal/vertical collision reflow and restoration, hovered and pinned inspection-slot layout, target-source focus preservation, origin-source focus dismissal, long-name source-handle clamping, delayed language-hover requests, safe hover-card rendering, direction branch visibility with shared-node retention, exact-pin suppression of aggregate node hover, exclusive relationship pinning, qualified-path range narrowing and icon-free source rendering, semantic and lexical source token segmentation, comment/string exclusion, lifetime-versus-character disambiguation, raw-identifier handling, aggregate-versus-exact source endpoint selection, multiple source call sites, and header-only node dragging.
 - `cargo test --manifest-path fixtures/rust-demo/Cargo.toml` — fixture compiles and its behavioral test passes.
 - `pnpm test:integration` — an isolated real VS Code Extension Host activates the installed rust-analyzer, resolves the `execute` method, observes its `validate_order` and trait `submit` outgoing calls, receives hover content for the `validate_order` Call Site through `vscode.executeHoverProvider`, runs **Show Rust Call Graph**, and observes the resulting Webview tab.
 - `pnpm audit --prod` — no known production dependency vulnerabilities.
-- `pnpm package` — produces a 178.87 KB installable VSIX containing only the extension bundle, Webview bundle, styles, README, changelog, and license.
+- `pnpm package` — produces a 180.05 KB installable VSIX containing only the extension bundle, Webview bundle, styles, README, changelog, and license.
 
 ## Interactive Webview QA
 
@@ -39,3 +39,5 @@ The built-in browser demo was exercised at a 1280×720 viewport:
 - Back restores the Entry Function focus and prior viewport.
 - Right-clicking a node opens a keyboard-compatible context menu containing **Open Source in VS Code**.
 - Computed cursor styles are `grab` on the node header, `default` on the React Flow node wrapper, node body, and signature, `text` in Source Expansion, and `pointer` on action buttons and source relationships.
+- With keyword semantic tokens deliberately omitted from the demo provider data, Source Expansion still renders `pub`, `fn`, both `let` occurrences, and `crate` using the keyword class and a color distinct from ordinary source text.
+- Pinning `validate_order` renders one exact edge at z-index 0, equal to the expanded node layer instead of the former z-index 20; DOM paint order keeps the routed line below Function Node UI while retaining the visible external segment and arrow.

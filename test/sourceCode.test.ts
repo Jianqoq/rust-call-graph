@@ -55,4 +55,103 @@ describe('buildSourceLines', () => {
 
     expect(tokenTypes).toEqual(expect.arrayContaining(['keyword', 'function', 'parameter']));
   });
+
+  it('adds lexical Rust colors when the semantic provider omits keywords and literals', () => {
+    const text = 'pub async fn load() { let ready = true; return ready; }';
+    const nameStart = text.indexOf('load');
+    const source: FunctionSourceDto = {
+      text,
+      startLine: 0,
+      startCharacter: 0,
+      relationships: [],
+      semanticTokens: [{
+        startOffset: nameStart,
+        endOffset: nameStart + 'load'.length,
+        tokenType: 'function',
+        modifiers: ['declaration']
+      }]
+    };
+
+    const renderedTokens = buildSourceLines(source).flatMap(line => line.segments.flatMap(segment => {
+      const semanticToken = (segment as { semanticToken?: { tokenType: string } }).semanticToken;
+      return semanticToken === undefined ? [] : [{ text: segment.text, tokenType: semanticToken.tokenType }];
+    }));
+
+    expect(renderedTokens).toEqual(expect.arrayContaining([
+      { text: 'pub', tokenType: 'keyword' },
+      { text: 'async', tokenType: 'keyword' },
+      { text: 'fn', tokenType: 'keyword' },
+      { text: 'let', tokenType: 'keyword' },
+      { text: 'true', tokenType: 'boolean' },
+      { text: 'return', tokenType: 'keyword' }
+    ]));
+  });
+
+  it('does not treat keywords inside comments or strings as code', () => {
+    const text = '// fn return\nlet message = "async false";';
+    const source: FunctionSourceDto = {
+      text,
+      startLine: 0,
+      startCharacter: 0,
+      relationships: [],
+      semanticTokens: []
+    };
+
+    const renderedTokens = buildSourceLines(source).flatMap(line => line.segments.flatMap(segment => {
+      const semanticToken = (segment as { semanticToken?: { tokenType: string } }).semanticToken;
+      return semanticToken === undefined ? [] : [{ text: segment.text, tokenType: semanticToken.tokenType }];
+    }));
+
+    expect(renderedTokens).toEqual(expect.arrayContaining([
+      { text: '// fn return', tokenType: 'comment' },
+      { text: 'let', tokenType: 'keyword' },
+      { text: '"async false"', tokenType: 'string' }
+    ]));
+    expect(renderedTokens).not.toEqual(expect.arrayContaining([
+      { text: 'async', tokenType: 'keyword' },
+      { text: 'false', tokenType: 'boolean' }
+    ]));
+  });
+
+  it('distinguishes Rust lifetimes from character literals', () => {
+    const text = "fn borrow<'a>(value: &'a str) -> char { 'x' }";
+    const source: FunctionSourceDto = {
+      text,
+      startLine: 0,
+      startCharacter: 0,
+      relationships: [],
+      semanticTokens: []
+    };
+
+    const renderedTokens = buildSourceLines(source).flatMap(line => line.segments.flatMap(segment => {
+      const semanticToken = (segment as { semanticToken?: { tokenType: string } }).semanticToken;
+      return semanticToken === undefined ? [] : [{ text: segment.text, tokenType: semanticToken.tokenType }];
+    }));
+
+    expect(renderedTokens).toEqual(expect.arrayContaining([
+      { text: "'a", tokenType: 'lifetime' },
+      { text: "'x'", tokenType: 'string' }
+    ]));
+  });
+
+  it('does not color the keyword portion of a raw identifier', () => {
+    const source: FunctionSourceDto = {
+      text: 'let r#type = 1;',
+      startLine: 0,
+      startCharacter: 0,
+      relationships: [],
+      semanticTokens: []
+    };
+
+    const renderedTokens = buildSourceLines(source).flatMap(line => line.segments.flatMap(segment => {
+      const semanticToken = (segment as { semanticToken?: { tokenType: string } }).semanticToken;
+      return semanticToken === undefined ? [] : [{ text: segment.text, tokenType: semanticToken.tokenType }];
+    }));
+
+    expect(renderedTokens).toEqual(expect.arrayContaining([
+      { text: 'let', tokenType: 'keyword' },
+      { text: '1', tokenType: 'number' }
+    ]));
+    expect(renderedTokens).not.toContainEqual({ text: 'type', tokenType: 'keyword' });
+  });
 });

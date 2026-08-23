@@ -330,7 +330,7 @@ function GraphSurface() {
       selectable: false,
       focusable: false,
       interactionWidth: 16,
-      zIndex: 20,
+      zIndex: 0,
       ...(edge.kind === 'membership' ? {} : {
         markerEnd: {
           type: MarkerType.ArrowClosed,

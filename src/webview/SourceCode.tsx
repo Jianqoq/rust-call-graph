@@ -7,6 +7,7 @@ import type {
 } from '../shared/protocol.js';
 import type { NodeActions, SourceHoverData } from './graphTypes.js';
 import { SourceHoverCard, type SourceHoverAnchor } from './SourceHoverCard.js';
+import { withRustSyntaxFallbacks } from './rustSyntaxFallback.js';
 
 interface SourceCodeProps {
   readonly nodeId: string;
@@ -315,7 +316,7 @@ export function buildSourceLines(source: FunctionSourceDto): readonly SourceLine
   const relationships = [...source.relationships]
     .filter(item => item.endOffset > item.startOffset)
     .sort((left, right) => left.startOffset - right.startOffset || left.endOffset - right.endOffset);
-  const semanticTokens = [...source.semanticTokens]
+  const semanticTokens = [...withRustSyntaxFallbacks(source.text, source.semanticTokens)]
     .filter(item => item.endOffset > item.startOffset)
     .sort((left, right) => left.startOffset - right.startOffset || left.endOffset - right.endOffset);
   const lines: SourceLine[] = [];
