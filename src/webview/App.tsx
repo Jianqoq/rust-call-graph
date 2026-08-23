@@ -581,7 +581,7 @@ function effectiveNodeSize(node: BaseFlowNode, expanded: boolean, measured: Size
     const lineCount = dto.kind === 'function' && dto.source !== undefined
       ? dto.source.text.split('\n').length
       : 1;
-    const baseHeight = dto.kind === 'function' && dto.detail !== '' ? 128 : 112;
+    const baseHeight = 112;
     const sourceHeight = Math.min(440, 45 + lineCount * 22.5) + 10;
     return { width: 660, height: baseHeight + sourceHeight };
   }

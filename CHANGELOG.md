@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.13
+
+- Removed the redundant function signature summary between the Function Node header and its **in**/**Source**/**out** controls.
+- Function Nodes now keep their compact header and actions; the full signature remains available in expanded Source and normal VS Code language hover.
+
 ## 0.1.12
 
 - Pinned and hovered source edges now render below Function Nodes, so scrolling keeps their exact endpoint aligned without drawing the routed line over Source Expansion, node actions, or other node UI.

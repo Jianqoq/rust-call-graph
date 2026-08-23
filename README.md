@@ -6,6 +6,7 @@ Rust Call Graph is a source-backed, interactive call graph for Rust workspaces i
 
 - Right-click inside a Rust function and choose **Show Rust Call Graph**.
 - Drag a Function, Struct, or Enum Node from its header. Node bodies retain the normal cursor, Source Expansion uses the text cursor, and interactive controls keep the pointer cursor.
+- Collapsed Function Nodes show only their type/name header and **in**/**Source**/**out** controls; the redundant one-line signature preview is omitted.
 - Hover any node to reveal its incident calls and function references from the node endpoint.
 - Click the lower-case **in** or **out** button to show every direct caller or callee up to the graph limit; the highlighted button is on, and a second click removes that direction from the canvas without discarding its cached analysis.
 - Expand a Function Node to inspect semantic-highlighted source; hovering an exact Call Site or Function Reference moves its target node into a nearby inspection slot and switches only that edge to its source-range endpoint. Leaving the source range restores the prior layout.

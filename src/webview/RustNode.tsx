@@ -86,7 +86,6 @@ function NodeHeader({ data }: { readonly data: RustNodeData }) {
 function FunctionBody({ node, data }: { readonly node: FunctionNodeDto; readonly data: RustNodeData }) {
   return (
     <>
-      {node.detail && <div className="node-signature" title={node.detail}>{node.detail}</div>}
       <div className="node-actions">
         <ExpansionButton
           side="incoming"

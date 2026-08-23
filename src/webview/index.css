@@ -432,7 +432,6 @@ button:focus-visible,
   height: 12px;
 }
 
-.node-signature,
 .type-detail {
   margin: 0;
   overflow: hidden;
@@ -442,10 +441,6 @@ button:focus-visible,
   line-height: 1.55;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.node-signature {
-  padding: 8px 12px 0;
 }
 
 .node-actions {

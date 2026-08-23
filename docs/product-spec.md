@@ -31,6 +31,7 @@ The first release targets desktop VS Code and workspace extension hosts used by 
 - The first layout places incoming callers to the left, the Entry Function in the center, and outgoing calls/references to the right.
 - Collapsed-node horizontal and vertical whitespace is half the original layout spacing. Node dimensions and typography do not shrink.
 - Every Function Node has lower-case, text-only **in** and **out** direction toggles. The first click resolves and shows all direct relationships in that direction up to the graph limit; the active button is highlighted. A second click removes that direction's branch from the canvas, and another click restores the cached branch immediately.
+- A collapsed Function Node contains its Function/name header and **in**/**Source**/**out** actions without a separate signature-summary row. Full source text remains available through Source Expansion.
 - Removing a branch retains any node that remains reachable through another visible relationship, preventing shared and cyclic nodes from disappearing incorrectly.
 - Existing nodes keep their baseline positions. Expanding source temporarily pushes overlapping nodes and compact right-hand columns aside using the measured expanded size; collapsing source restores the vacated space. User-dragged baseline positions are never overwritten by later relationship expansion or refresh.
 - Nodes are draggable only from their header. The remaining node surface uses the default cursor, selectable Source Expansion uses the text cursor, and controls and source relationships use the pointer cursor.
@@ -106,3 +107,4 @@ The first release targets desktop VS Code and workspace extension hosts used by 
 20. Hovering a node body never presents a drag cursor; dragging begins only from its header, while expanded source remains text-selectable and interactive elements retain a pointer cursor.
 21. Scrolling a pinned source relationship updates its exact endpoint without drawing the edge above Source Expansion, action buttons, or any other Function Node surface.
 22. Rust keywords and lexical literals receive theme-aware syntax color even when the active semantic provider omits those token ranges, without overriding overlapping semantic tokens.
+23. Function Nodes do not render a signature-summary row between the header and actions; the function name, navigation controls, direction controls, and Source Expansion remain available.
