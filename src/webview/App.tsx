@@ -10,6 +10,7 @@ import {
   type Edge,
   type NodeChange,
   type NodeMouseHandler,
+  type OnNodeDrag,
   type NodeProps,
   type NodeTypes,
   type Viewport
@@ -38,8 +39,8 @@ import { bridge } from './bridge.js';
 import { edgeIsVisible, edgeSourceHandleId, nodeHoverEdgeTarget } from './edgeVisibility.js';
 import { directionIsActive, directionKey, visibleGraph } from './graphView.js';
 import type { BaseFlowNode, HoveredRelationship, NodeActions, RustFlowNode, SourceHoverData } from './graphTypes.js';
-import { activeInspectionRelationships, clearNodeSelection, nextPinnedRelationship, pinnedRelationshipAfterSourceToggle } from './interactionState.js';
-import { layoutGraph, makeRoomForExpandedSources, moveInspectionTargetsNearOrigins, type Point, type Size } from './layout.js';
+import { activeInspectionRelationships, clearNodeSelection, nextPinnedRelationship, pinnedRelationshipAfterSourceToggle, promoteRecentRelationship } from './interactionState.js';
+import { gridColumnExtent, layoutGraph, makeRoomForExpandedSources, reorderRecentTargetsInGrid, type Point, type Size } from './layout.js';
 import { NODE_INTERACTION } from './nodeInteraction.js';
 import { RustNode } from './RustNode.js';
 
@@ -70,6 +71,7 @@ function GraphSurface() {
   const [collapsedDirections, setCollapsedDirections] = useState<ReadonlySet<string>>(new Set());
   const [pinnedNodeId, setPinnedNodeId] = useState<string>();
   const [pinnedRelationship, setPinnedRelationship] = useState<HoveredRelationship>();
+  const [recentRelationships, setRecentRelationships] = useState<readonly HoveredRelationship[]>([]);
   const [focusNodeId, setFocusNodeId] = useState<string>();
   const [navigation, setNavigation] = useState<readonly NavigationEntry[]>([]);
   const [loadingLabel, setLoadingLabel] = useState('');
@@ -117,11 +119,23 @@ function GraphSurface() {
     setAnnouncement(`Returned to ${node?.data.dto.label ?? 'the previous node'}.`);
   }, [flow, navigation, reducedMotion]);
 
+  const rememberRelationship = useCallback((relationship: HoveredRelationship) => {
+    setRecentRelationships(history => promoteRecentRelationship(history, relationship));
+  }, []);
+
+  const hoverRelationship = useCallback((relationship: HoveredRelationship | undefined) => {
+    setHoveredRelationship(relationship);
+    if (relationship !== undefined) {
+      rememberRelationship(relationship);
+    }
+  }, [rememberRelationship]);
+
   const pinRelationship = useCallback((relationship: HoveredRelationship) => {
+    rememberRelationship(relationship);
     setPinnedNodeId(undefined);
     setBaseNodes(clearNodeSelection);
     setPinnedRelationship(current => nextPinnedRelationship(current, relationship));
-  }, []);
+  }, [rememberRelationship]);
 
   const requestSourceHover = useCallback((nodeId: string, sourceOffset: number) => {
     const requestId = sourceHoverRequestId.current + 1;
@@ -174,12 +188,12 @@ function GraphSurface() {
     openSource: nodeId => bridge.postMessage({ type: 'openSource', nodeId }),
     focusNode: nodeId => focusGraphNode(nodeId),
     goBack,
-    hoverRelationship: setHoveredRelationship,
+    hoverRelationship,
     pinRelationship,
     followRelationship: (originNodeId, targetNodeId) => focusGraphNode(targetNodeId, originNodeId),
     requestSourceHover,
     clearSourceHover
-  }), [clearSourceHover, focusGraphNode, goBack, pinRelationship, requestSourceHover, toggleFunctionDirection]);
+  }), [clearSourceHover, focusGraphNode, goBack, hoverRelationship, pinRelationship, requestSourceHover, toggleFunctionDirection]);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent<HostToWebviewMessage>): void => {
@@ -189,15 +203,17 @@ function GraphSurface() {
           .filter(node => node.kind === 'function' && node.source !== undefined)
           .map(node => node.id));
         setSnapshot(message.snapshot);
+        const snapshotNodeIds = new Set(message.snapshot.nodes.map(node => node.id));
+        setRecentRelationships(history => history.filter(relationship =>
+          snapshotNodeIds.has(relationship.originNodeId) && snapshotNodeIds.has(relationship.targetNodeId)
+        ));
         setFocusNodeId(current => current ?? message.snapshot.rootId);
         setAnnouncement(`${message.snapshot.nodes.length} nodes in the graph.`);
         setAnnouncementTone(message.snapshot.limits.limitReached ? 'warning' : 'info');
         reconcileNodes(
           message.snapshot,
           setBaseNodes,
-          baselinePositions.current,
-          expandedSourceIds.current,
-          measuredSizes.current
+          baselinePositions.current
         );
       } else if (message.type === 'operation') {
         setLoadingLabel(message.state === 'loading' ? message.label : '');
@@ -272,7 +288,7 @@ function GraphSurface() {
     const visibleBaseNodes = baseNodes.filter(node => graphView?.nodeIds.has(node.id) === true);
     const boxes = visibleBaseNodes.map(node => ({
       id: node.id,
-      position: node.position,
+      position: baselinePositions.current.get(node.id) ?? node.position,
       size: effectiveNodeSize(
         node,
         node.data.dto.kind === 'function' && node.data.dto.source !== undefined,
@@ -280,16 +296,26 @@ function GraphSurface() {
       )
     }));
     const inspectionRelationships = activeInspectionRelationships(pinnedRelationship, hoveredRelationship);
-    const positions = inspectionRelationships.length === 0
-      ? new Map(boxes.map(box => [box.id, box.position]))
-      : moveInspectionTargetsNearOrigins(boxes, inspectionRelationships);
+    const gridPositions = reorderRecentTargetsInGrid(boxes, recentRelationships);
+    const reorderedBoxes = boxes.map(box => ({
+      ...box,
+      position: gridPositions.get(box.id) ?? box.position
+    }));
+    const visibleExpandedIds = new Set(reorderedBoxes
+      .filter(box => expandedSourceIds.current.has(box.id))
+      .map(box => box.id));
+    const positions = makeRoomForExpandedSources(reorderedBoxes, visibleExpandedIds);
     const inspectionTargetIds = new Set(inspectionRelationships.map(relationship => relationship.targetNodeId));
+    const sizes = new Map(reorderedBoxes.map(box => [box.id, box.size]));
 
     return visibleBaseNodes.map(node => {
       const dto = node.data.dto;
+      const position = positions.get(node.id) ?? node.position;
+      const size = sizes.get(node.id) ?? { width: 338, height: 120 };
       return {
         ...node,
-        position: positions.get(node.id) ?? node.position,
+        position,
+        extent: gridColumnExtent(positions, position, size),
         data: {
           ...node.data,
           root: node.id === snapshot?.rootId,
@@ -303,7 +329,7 @@ function GraphSurface() {
         }
       };
     });
-  }, [actions, baseNodes, collapsedDirections, focusNodeId, graphView, hoveredRelationship, navigation.length, pinnedRelationship, snapshot?.rootId, sourceHover]);
+  }, [actions, baseNodes, collapsedDirections, focusNodeId, graphView, hoveredRelationship, navigation.length, pinnedRelationship, recentRelationships, snapshot?.rootId, sourceHover]);
 
   const edges = useMemo<Edge[]>(() => snapshot === undefined || graphView === undefined ? [] : graphView.edges.map(edge => {
     const visible = edgeIsVisible(edge, {
@@ -354,18 +380,30 @@ function GraphSurface() {
 
   const onNodesChange = useCallback((changes: NodeChange<BaseFlowNode>[]) => {
     setBaseNodes(current => {
-      const next = applyNodeChanges(changes, current);
-      let dimensionsChanged = false;
-      let positionChanged = false;
-      let dragging = false;
+      const canonicalGrid = snapshot === undefined ? undefined : layoutGraph(snapshot, new Map());
+      const constrainedChanges = changes.map(change => {
+        if (change.type !== 'position' || change.position === undefined) {
+          return change;
+        }
+        const baseline = baselinePositions.current.get(change.id) ?? change.position;
+        const bounds = canonicalGrid === undefined
+          ? undefined
+          : columnYBounds(canonicalGrid, canonicalGrid.get(change.id)?.x ?? baseline.x);
+        return {
+          ...change,
+          position: {
+            x: baseline.x,
+            y: bounds === undefined
+              ? change.position.y
+              : Math.max(bounds.min, Math.min(bounds.max, change.position.y))
+          }
+        };
+      });
+      const next = applyNodeChanges(constrainedChanges, current);
 
-      for (const change of changes) {
-        if (change.type === 'dimensions') {
-          dimensionsChanged = true;
-        } else if (change.type === 'position' && change.position !== undefined) {
+      for (const change of constrainedChanges) {
+        if (change.type === 'position' && change.position !== undefined) {
           baselinePositions.current.set(change.id, change.position);
-          positionChanged = true;
-          dragging ||= change.dragging === true;
         }
       }
 
@@ -378,17 +416,26 @@ function GraphSurface() {
         }
       }
 
-      if (dimensionsChanged || (positionChanged && !dragging)) {
-        return arrangeExpandedSources(
-          next,
-          baselinePositions.current,
-          expandedSourceIds.current,
-          measuredSizes.current
-        );
-      }
       return next;
     });
-  }, []);
+  }, [snapshot]);
+
+  const onNodeDragStop: OnNodeDrag<RustFlowNode> = useCallback(() => {
+    if (snapshot === undefined) {
+      return;
+    }
+    setBaseNodes(current => {
+      const snapped = layoutGraph(snapshot, baselinePositions.current);
+      baselinePositions.current.clear();
+      for (const [id, position] of snapped) {
+        baselinePositions.current.set(id, position);
+      }
+      return current.map(node => ({
+        ...node,
+        position: snapped.get(node.id) ?? node.position
+      }));
+    });
+  }, [snapshot]);
 
   const onNodeClick: NodeMouseHandler<RustFlowNode> = useCallback((event, node) => {
     if ((event.target as HTMLElement).closest('button,[role="menuitem"]') !== null) {
@@ -437,6 +484,7 @@ function GraphSurface() {
         nodeTypes={nodeTypes}
         fitView
         onNodesChange={onNodesChange}
+        onNodeDragStop={onNodeDragStop}
         onNodeClick={onNodeClick}
         onNodeDoubleClick={onNodeDoubleClick}
         onNodeMouseEnter={(_, node) => setHoveredNodeId(nodeHoverEdgeTarget(node.data.dto))}
@@ -519,9 +567,7 @@ function GraphToolbar({
 function reconcileNodes(
   snapshot: GraphSnapshotDto,
   setNodes: (update: (current: BaseFlowNode[]) => BaseFlowNode[]) => void,
-  baselinePositions: Map<string, Point>,
-  expandedSourceIds: ReadonlySet<string>,
-  measuredSizes: ReadonlyMap<string, Size>
+  baselinePositions: Map<string, Point>
 ): void {
   setNodes(current => {
     const previous = new Map<string, Point>();
@@ -547,29 +593,8 @@ function reconcileNodes(
       ...NODE_INTERACTION,
       className: dto.kind === 'function' && dto.external ? 'flow-node-external' : ''
     }));
-    return arrangeExpandedSources(nodes, baselinePositions, expandedSourceIds, measuredSizes);
+    return nodes;
   });
-}
-
-function arrangeExpandedSources(
-  nodes: readonly BaseFlowNode[],
-  baselinePositions: ReadonlyMap<string, Point>,
-  expandedSourceIds: ReadonlySet<string>,
-  measuredSizes: ReadonlyMap<string, Size>
-): BaseFlowNode[] {
-  const boxes = nodes.map(node => {
-    const expanded = expandedSourceIds.has(node.id);
-    return {
-      id: node.id,
-      position: baselinePositions.get(node.id) ?? node.position,
-      size: effectiveNodeSize(node, expanded, measuredSizes.get(node.id))
-    };
-  });
-  const positions = makeRoomForExpandedSources(boxes, expandedSourceIds);
-  return nodes.map(node => ({
-    ...node,
-    position: positions.get(node.id) ?? node.position
-  }));
 }
 
 function effectiveNodeSize(node: BaseFlowNode, expanded: boolean, measured: Size | undefined): Size {
@@ -600,6 +625,19 @@ function persistView(
     positions: Object.fromEntries(nodes.map(node => [node.id, baselinePositions.get(node.id) ?? node.position])),
     viewport
   });
+}
+
+function columnYBounds(
+  positions: ReadonlyMap<string, Point>,
+  x: number
+): { readonly min: number; readonly max: number } | undefined {
+  const rows = [...positions.values()]
+    .filter(position => Math.abs(position.x - x) < 0.5)
+    .map(position => position.y);
+  if (rows.length === 0) {
+    return undefined;
+  }
+  return { min: Math.min(...rows), max: Math.max(...rows) };
 }
 
 function sourceHasRelationship(snapshot: GraphSnapshotDto, edge: GraphEdgeDto): boolean {

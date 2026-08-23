@@ -21,29 +21,24 @@ export interface InspectionRelationship {
   readonly targetNodeId: string;
 }
 
-// A collapsed Function Node is 338px wide and about 120px high. These steps
-// leave half of the original visible whitespace: 211px horizontally and about
-// 47px vertically for measured Function Nodes. Expanded source temporarily
-// pushes right-hand columns aside.
+export type GridExtent = [[number, number], [number, number]];
+
+// A collapsed Function Node is 338px wide and about 112px high. Nodes occupy
+// fixed rank columns and bounded row cells; interaction may permute which node
+// owns a cell but never invents a free-form inspection coordinate.
 const COLUMN_GAP = 549;
 const ROW_GAP = 183;
 const SOURCE_HORIZONTAL_CLEARANCE = 50;
 const SOURCE_VERTICAL_CLEARANCE = 24;
-const HOVER_TARGET_GAP = 60;
-const HOVER_TARGET_MAX_Y_OFFSET = 96;
 
 export function layoutGraph(
   snapshot: GraphSnapshotDto,
   previous: ReadonlyMap<string, Point>
 ): ReadonlyMap<string, Point> {
-  const positions = new Map(previous);
   const ranks = discoverRanks(snapshot.rootId, snapshot.edges);
   const groups = new Map<number, string[]>();
 
   for (const node of snapshot.nodes) {
-    if (positions.has(node.id)) {
-      continue;
-    }
     const rank = node.kind === 'type'
       ? typeRank(node.id, snapshot.edges, ranks)
       : ranks.get(node.id) ?? connectedRank(node.id, snapshot.edges, ranks);
@@ -52,32 +47,31 @@ export function layoutGraph(
     groups.set(rank, group);
   }
 
+  const positions = new Map<string, Point>();
   for (const [rank, ids] of groups) {
-    const occupied = [...positions.entries()]
-      .filter(([, point]) => Math.abs(point.x - rank * COLUMN_GAP) < COLUMN_GAP / 2)
-      .map(([, point]) => point.y);
-    let slot = 0;
-    for (const id of ids) {
-      let y = centeredSlot(slot, ids.length);
-      while (occupied.some(existing => Math.abs(existing - y) < ROW_GAP * 0.8)) {
-        slot += 1;
-        y = centeredSlot(slot, ids.length);
-      }
-      positions.set(id, { x: rank * COLUMN_GAP, y });
-      occupied.push(y);
-      slot += 1;
+    const availableRows = gridRows(ids.length);
+    const rootIndex = ids.indexOf(snapshot.rootId);
+    if (rootIndex !== -1) {
+      positions.set(snapshot.rootId, { x: rank * COLUMN_GAP, y: 0 });
+      availableRows.splice(availableRows.indexOf(0), 1);
     }
-  }
 
-  if (!positions.has(snapshot.rootId)) {
-    positions.set(snapshot.rootId, { x: 0, y: 0 });
+    const ordered = ids
+      .filter(id => id !== snapshot.rootId)
+      .sort((left, right) => compareByPreviousPosition(left, right, previous));
+    for (const id of ordered) {
+      const desiredY = previous.get(id)?.y ?? 0;
+      const rowIndex = nearestRowIndex(availableRows, desiredY);
+      const [y = 0] = availableRows.splice(rowIndex, 1);
+      positions.set(id, { x: rank * COLUMN_GAP, y });
+    }
   }
   return positions;
 }
 
 /**
  * Temporarily makes vertical room for expanded source nodes without changing
- * the graph's baseline/manual positions. Starting from the baseline on every
+ * the graph's baseline grid cells. Starting from the baseline on every
  * pass also means collapsing source naturally restores the vacated space.
  */
 export function makeRoomForExpandedSources(
@@ -154,67 +148,91 @@ function makeHorizontalRoom(
   return arranged;
 }
 
-/** Temporarily reserves a readable inspection slot beside a source node. */
-export function moveHoveredTargetNearOrigin(
-  nodes: readonly LayoutBox[],
-  originNodeId: string,
-  targetNodeId: string
-): ReadonlyMap<string, Point> {
-  return moveInspectionTargetsNearOrigins(nodes, [{ originNodeId, targetNodeId }]);
-}
-
-/** Keeps pinned targets near their source and adds hovered targets as a second inspection slot. */
-export function moveInspectionTargetsNearOrigins(
+/**
+ * Reassigns existing cells within each target column by visit recency. The
+ * newest target receives the cell vertically closest to the source node, and
+ * older targets take progressively farther cells. X coordinates and the set
+ * of Y coordinates are invariant, so the result cannot escape the grid.
+ */
+export function reorderRecentTargetsInGrid(
   nodes: readonly LayoutBox[],
   relationships: readonly InspectionRelationship[]
 ): ReadonlyMap<string, Point> {
-  let arranged = nodes.map(node => ({ ...node, position: { ...node.position } }));
-  const grouped = new Map<string, string[]>();
-  for (const relationship of relationships) {
-    const targets = grouped.get(relationship.originNodeId) ?? [];
-    if (!targets.includes(relationship.targetNodeId) && relationship.originNodeId !== relationship.targetNodeId) {
-      targets.push(relationship.targetNodeId);
-      grouped.set(relationship.originNodeId, targets);
+  const positions = new Map(nodes.map(node => [node.id, { ...node.position }]));
+  const newest = relationships[0];
+  if (newest === undefined) {
+    return positions;
+  }
+  const origin = nodes.find(node => node.id === newest.originNodeId);
+  if (origin === undefined) {
+    return positions;
+  }
+
+  const recentTargetIds = relationships
+    .filter(relationship => relationship.originNodeId === origin.id && relationship.targetNodeId !== origin.id)
+    .map(relationship => relationship.targetNodeId)
+    .filter((id, index, ids) => ids.indexOf(id) === index && nodes.some(node => node.id === id));
+  const targetColumns = [...new Set(recentTargetIds.map(id =>
+    nodes.find(node => node.id === id)?.position.x
+  ).filter((x): x is number => x !== undefined))];
+
+  for (const columnX of targetColumns) {
+    const columnNodes = nodes.filter(node => sameColumn(node.position.x, columnX));
+    const columnTargetIds = recentTargetIds.filter(id => {
+      const target = nodes.find(node => node.id === id);
+      return target !== undefined && sameColumn(target.position.x, columnX);
+    });
+    const nearestCells = columnNodes
+      .map(node => ({ ...node.position }))
+      .sort((left, right) =>
+        Math.abs(left.y - origin.position.y) - Math.abs(right.y - origin.position.y)
+        || left.y - right.y
+      );
+    const assignedCellKeys = new Set<string>();
+    for (const [index, targetId] of columnTargetIds.entries()) {
+      const cell = nearestCells[index];
+      if (cell === undefined) {
+        break;
+      }
+      positions.set(targetId, cell);
+      assignedCellKeys.add(pointKey(cell));
+    }
+
+    const remainingCells = columnNodes
+      .map(node => ({ ...node.position }))
+      .filter(cell => !assignedCellKeys.has(pointKey(cell)))
+      .sort((left, right) => left.y - right.y);
+    const remainingNodes = columnNodes
+      .filter(node => !columnTargetIds.includes(node.id))
+      .sort((left, right) => left.position.y - right.position.y || left.id.localeCompare(right.id));
+    for (const [index, node] of remainingNodes.entries()) {
+      const cell = remainingCells[index];
+      if (cell !== undefined) {
+        positions.set(node.id, cell);
+      }
     }
   }
 
-  const inspectionTargetIds = new Set<string>();
-  for (const [originNodeId, targetNodeIds] of grouped) {
-    const origin = arranged.find(node => node.id === originNodeId);
-    const targets = targetNodeIds
-      .map(targetId => arranged.find(node => node.id === targetId))
-      .filter((target): target is LayoutBox => target !== undefined);
-    if (origin === undefined || targets.length === 0) {
-      continue;
-    }
+  return positions;
+}
 
-    const targetX = origin.position.x + origin.size.width + HOVER_TARGET_GAP;
-    const firstTarget = targets[0];
-    const verticalRoom = firstTarget === undefined ? 0 : Math.max(0, (origin.size.height - firstTarget.size.height) / 2);
-    let targetY = origin.position.y + Math.min(HOVER_TARGET_MAX_Y_OFFSET, verticalRoom);
-    for (const target of targets) {
-      inspectionTargetIds.add(target.id);
-      const position = { x: targetX, y: targetY };
-      arranged = arranged.map(node => node.id === target.id ? { ...node, position } : node);
-      targetY += target.size.height + SOURCE_VERTICAL_CLEARANCE;
-    }
-
-    const inspectionRight = targetX + Math.max(...targets.map(target => target.size.width)) + SOURCE_HORIZONTAL_CLEARANCE;
-    const nearestObstructingColumn = arranged
-      .filter(node => !inspectionTargetIds.has(node.id)
-        && node.position.x > origin.position.x
-        && node.position.x < inspectionRight)
-      .reduce<number | undefined>((nearest, node) =>
-        nearest === undefined ? node.position.x : Math.min(nearest, node.position.x), undefined);
-    if (nearestObstructingColumn !== undefined) {
-      const shift = inspectionRight - nearestObstructingColumn;
-      arranged = arranged.map(node => !inspectionTargetIds.has(node.id) && node.position.x >= nearestObstructingColumn
-        ? { ...node, position: { x: node.position.x + shift, y: node.position.y } }
-        : node);
-    }
-  }
-
-  return makeRoomForExpandedSources(arranged, inspectionTargetIds);
+/**
+ * React Flow constrains the entire node rectangle, so the maximum boundary
+ * includes the node's own width and height. This locks its top-left x to the
+ * current column while allowing y only inside that column's rendered rows.
+ */
+export function gridColumnExtent(
+  positions: ReadonlyMap<string, Point>,
+  position: Point,
+  size: Size
+): GridExtent {
+  const rows = [...positions.values()]
+    .filter(point => sameColumn(point.x, position.x))
+    .map(point => point.y);
+  return [
+    [position.x, Math.min(...rows, position.y)],
+    [position.x + size.width, Math.max(...rows, position.y) + size.height]
+  ];
 }
 
 function horizontalBandsOverlap(left: LayoutBox, right: LayoutBox): boolean {
@@ -222,8 +240,51 @@ function horizontalBandsOverlap(left: LayoutBox, right: LayoutBox): boolean {
     && left.position.x + left.size.width + SOURCE_HORIZONTAL_CLEARANCE > right.position.x;
 }
 
-function centeredSlot(index: number, total: number): number {
-  return (index - (total - 1) / 2) * ROW_GAP;
+function gridRows(count: number): number[] {
+  const rows = [0];
+  for (let distance = 1; rows.length < count; distance += 1) {
+    rows.push(distance * ROW_GAP);
+    if (rows.length < count) {
+      rows.push(-distance * ROW_GAP);
+    }
+  }
+  return rows;
+}
+
+function compareByPreviousPosition(left: string, right: string, previous: ReadonlyMap<string, Point>): number {
+  const leftPosition = previous.get(left);
+  const rightPosition = previous.get(right);
+  if (leftPosition !== undefined && rightPosition !== undefined) {
+    return leftPosition.y - rightPosition.y || left.localeCompare(right);
+  }
+  if (leftPosition !== undefined) {
+    return -1;
+  }
+  if (rightPosition !== undefined) {
+    return 1;
+  }
+  return left.localeCompare(right);
+}
+
+function nearestRowIndex(rows: readonly number[], desiredY: number): number {
+  let nearest = 0;
+  for (let index = 1; index < rows.length; index += 1) {
+    const candidate = rows[index] ?? 0;
+    const current = rows[nearest] ?? 0;
+    if (Math.abs(candidate - desiredY) < Math.abs(current - desiredY)
+      || (Math.abs(candidate - desiredY) === Math.abs(current - desiredY) && candidate < current)) {
+      nearest = index;
+    }
+  }
+  return nearest;
+}
+
+function sameColumn(left: number, right: number): boolean {
+  return Math.abs(left - right) < 0.5;
+}
+
+function pointKey(point: Point): string {
+  return `${point.x}:${point.y}`;
 }
 
 function discoverRanks(rootId: string, edges: readonly GraphEdgeDto[]): Map<string, number> {

@@ -49,8 +49,12 @@ The read-only presentation of a Function Node's complete source definition insid
 _Avoid_: editor, source file, code preview
 
 **Pinned Relationship**:
-A relationship deliberately kept visible after its node or source range is selected. A pinned source relationship also keeps its target in a nearby inspection slot until the user dismisses or replaces it.
+A relationship deliberately kept visible after its node or source range is selected. Pinning controls exact-edge visibility while the target also participates in Recent Target ordering.
 _Avoid_: permanent edge, selected node
+
+**Recent Target**:
+A Function Node most recently reached by hovering or selecting a Call Site or Function Reference. Within its existing rank column, newer Recent Targets occupy cells closer to the source and older ones progressively farther away.
+_Avoid_: inspection slot, floating target, temporary node
 
 **Graph Focus**:
 The Function Node or Type Node currently brought into the user's visual attention without changing the active VS Code editor.

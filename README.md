@@ -5,23 +5,23 @@ Rust Call Graph is a source-backed, interactive call graph for Rust workspaces i
 ## First-release interactions
 
 - Right-click inside a Rust function and choose **Show Rust Call Graph**.
-- Drag a Function, Struct, or Enum Node from its header. Node bodies retain the normal cursor, Source Expansion uses the text cursor, and interactive controls keep the pointer cursor.
+- Drag a Function, Struct, or Enum Node from its header. Dragging is vertical-only inside the node's existing column and bounded by that column's outer rows; release snaps the ordering back onto legal grid cells. Node bodies retain the normal cursor, Source Expansion uses the text cursor, and interactive controls keep the pointer cursor.
 - Collapsed Function Nodes show only their type/name header and **in**/**Source**/**out** controls; the redundant one-line signature preview is omitted.
 - Hover any node to reveal its incident calls and function references from the node endpoint.
 - Click the lower-case **in** or **out** button to show every direct caller or callee up to the graph limit; the highlighted button is on, and a second click removes that direction from the canvas without discarding its cached analysis.
-- Expand a Function Node to inspect semantic-highlighted source; hovering an exact Call Site or Function Reference moves its target node into a nearby inspection slot and switches only that edge to its source-range endpoint. Leaving the source range restores the prior layout.
+- Expand a Function Node to inspect semantic-highlighted source; hovering an exact Call Site or Function Reference promotes its target into the closest available row cell in its existing column and switches only that edge to its source-range endpoint. Recently inspected targets stay ordered newest-nearest and older-farther after the pointer leaves.
 - Source Expansion combines rust-analyzer semantic tokens with a lexical Rust fallback and a dedicated VS Code theme palette, so keywords, functions, types, variables, literals, strings, comments, and lifetimes remain visibly distinct even when symbol-icon colors match ordinary text.
 - Pause over any semantic Rust token in Source Expansion to see signature and documentation content from the active VS Code hover provider, normally rust-analyzer. This uses the real workspace document and position rather than embedding a second editor or language server.
 - Language hover does not replace graph interaction: a relationship function still highlights its exact edge on hover, and left-click still focuses/pins its target node.
 - If a highlighted function name extends beyond the Source Expansion viewport, its exact edge endpoint stays on the visible right boundary; horizontal scrolling returns the endpoint to the function name when its end becomes visible.
 - Scrolling a pinned Call Site or Function Reference keeps its endpoint aligned while the routed edge stays behind Function Nodes, preventing lines from overlaying Source Expansion or node controls.
-- Single-click a highlighted source function to focus that one relationship. Its target stays in the nearby inspection slot after the pointer leaves; clicking another highlighted function transfers the focus and restores the previous target instead of accumulating arrows.
-- Expanding or collapsing Source on that focused target keeps it in the nearby inspection composition; only hiding the origin Source that owns the relationship dismisses the focus.
+- Single-click a highlighted source function to focus that one relationship. Its target stays in its recent grid position after the pointer leaves; clicking another highlighted function transfers the exact-edge focus and promotes the new target without accumulating pinned arrows.
+- Expanding or collapsing Source on that focused target keeps its recent grid position; only hiding the origin Source that owns the relationship dismisses the focus.
 - While an exact source relationship is pinned, moving over the rest of its Function Node does not reveal aggregate node connections; hovering another source function temporarily adds only that exact relationship.
 - Double-click a highlighted source relationship to focus its target; use **Back** on the target node to return.
 - Right-click any node and choose **Open Source in VS Code** to open its definition.
 - Expand Struct and Enum methods progressively without duplicating cyclic nodes.
-- The compact layout uses half the earlier horizontal and vertical whitespace; Source Expansion temporarily shifts right-hand columns to prevent overlap and restores their baseline positions when collapsed.
+- The compact layout uses half the earlier horizontal and vertical whitespace. Nodes occupy fixed rank columns and bounded row cells; hover recency permutes cells vertically without creating free-form coordinates. Source Expansion can shift a complete right-hand column to prevent overlap and restores the grid when collapsed.
 
 ## Requirements
 

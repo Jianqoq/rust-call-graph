@@ -23,7 +23,7 @@ export function clearNodeSelection<T extends { readonly selected?: boolean }>(no
   return nodes.map(node => node.selected ? { ...node, selected: false } : node);
 }
 
-/** Relationships whose target nodes currently occupy temporary inspection slots. */
+/** Relationships whose targets are currently emphasized by pin or hover. */
 export function activeInspectionRelationships(
   pinned: HoveredRelationship | undefined,
   hovered: HoveredRelationship | undefined
@@ -35,4 +35,21 @@ export function activeInspectionRelationships(
     return [pinned];
   }
   return [pinned, hovered];
+}
+
+/** Keeps one source node's targets in newest-first browsing order. */
+export function promoteRecentRelationship(
+  history: readonly HoveredRelationship[],
+  relationship: HoveredRelationship
+): readonly HoveredRelationship[] {
+  if (history[0]?.originNodeId !== undefined && history[0].originNodeId !== relationship.originNodeId) {
+    return [relationship];
+  }
+  return [
+    relationship,
+    ...history.filter(item =>
+      item.originNodeId === relationship.originNodeId
+      && item.targetNodeId !== relationship.targetNodeId
+    )
+  ];
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { sourceRelationshipNameRange } from '../src/shared/sourceRelationship.js';
-import { activeInspectionRelationships, clearNodeSelection, nextPinnedRelationship, pinnedRelationshipAfterSourceToggle } from '../src/webview/interactionState.js';
+import { activeInspectionRelationships, clearNodeSelection, nextPinnedRelationship, pinnedRelationshipAfterSourceToggle, promoteRecentRelationship } from '../src/webview/interactionState.js';
 
 describe('source relationship selection', () => {
   it('replaces the previously pinned relationship when another function is clicked', () => {
@@ -25,7 +25,7 @@ describe('source relationship selection', () => {
     ]);
   });
 
-  it('keeps a pinned target in an inspection slot after source hover ends', () => {
+  it('keeps a pinned target emphasized after source hover ends', () => {
     const pinned = { edgeId: 'edge:selected', originNodeId: 'root', targetNodeId: 'selected' };
     expect(activeInspectionRelationships(pinned, undefined)).toEqual([pinned]);
   });
@@ -34,6 +34,33 @@ describe('source relationship selection', () => {
     const pinned = { edgeId: 'edge:selected', originNodeId: 'root', targetNodeId: 'selected' };
     const hovered = { edgeId: 'edge:hovered', originNodeId: 'root', targetNodeId: 'hovered' };
     expect(activeInspectionRelationships(pinned, hovered)).toEqual([pinned, hovered]);
+  });
+
+  it('keeps the most recently hovered target first and demotes earlier targets', () => {
+    const first = { edgeId: 'edge:first', originNodeId: 'root', targetNodeId: 'first' };
+    const second = { edgeId: 'edge:second', originNodeId: 'root', targetNodeId: 'second' };
+    const third = { edgeId: 'edge:third', originNodeId: 'root', targetNodeId: 'third' };
+    const history = promoteRecentRelationship(
+      promoteRecentRelationship(promoteRecentRelationship([], first), second),
+      third
+    );
+
+    expect(history.map(item => item.targetNodeId)).toEqual(['third', 'second', 'first']);
+  });
+
+  it('restarts recent-target ordering when hovering from another source node', () => {
+    const previous = { edgeId: 'edge:first', originNodeId: 'root', targetNodeId: 'first' };
+    const nextOrigin = { edgeId: 'edge:next', originNodeId: 'other-root', targetNodeId: 'next' };
+
+    expect(promoteRecentRelationship([previous], nextOrigin)).toEqual([nextOrigin]);
+  });
+
+  it('promotes an already visited target without duplicating it', () => {
+    const first = { edgeId: 'edge:first', originNodeId: 'root', targetNodeId: 'first' };
+    const second = { edgeId: 'edge:second', originNodeId: 'root', targetNodeId: 'second' };
+    const revisit = { edgeId: 'edge:first-again', originNodeId: 'root', targetNodeId: 'first' };
+
+    expect(promoteRecentRelationship([second, first], revisit)).toEqual([revisit, second]);
   });
 
   it('keeps relationship focus when Source is toggled on its target node', () => {

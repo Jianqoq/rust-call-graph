@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GraphSnapshotDto } from '../src/shared/protocol.js';
-import { layoutGraph, makeRoomForExpandedSources, moveHoveredTargetNearOrigin, moveInspectionTargetsNearOrigins } from '../src/webview/layout.js';
+import { gridColumnExtent, layoutGraph, makeRoomForExpandedSources, reorderRecentTargetsInGrid } from '../src/webview/layout.js';
 
 const position = { line: 0, character: 0 };
 const range = { start: position, end: position };
@@ -48,10 +48,11 @@ describe('layoutGraph', () => {
     expect(layout.size).toBe(4);
   });
 
-  it('preserves manually positioned nodes when graph relationships change', () => {
+  it('normalizes saved positions back into fixed graph columns and rows', () => {
     const manual = new Map([['root', { x: 137, y: 91 }]]);
     const layout = layoutGraph(snapshot(), manual);
-    expect(layout.get('root')).toEqual({ x: 137, y: 91 });
+    expect(layout.get('root')).toEqual({ x: 0, y: 0 });
+    expect([...layout.values()].every(point => point.x % 549 === 0 && point.y % 183 === 0)).toBe(true);
   });
 
   it('uses half-size horizontal and vertical whitespace between collapsed nodes', () => {
@@ -109,31 +110,52 @@ describe('layoutGraph', () => {
     expect(layout.get('below')).toEqual({ x: 17, y: 261 });
   });
 
-  it('temporarily moves a hovered source target into a nearby inspection slot', () => {
-    const layout = moveHoveredTargetNearOrigin([
+  it('assigns recent targets to same-column cells from newest and nearest to oldest and farthest', () => {
+    const boxes = [
       { id: 'origin', position: { x: 0, y: 0 }, size: { width: 660, height: 560 } },
-      { id: 'target', position: { x: 1520, y: 920 }, size: { width: 338, height: 120 } },
-      { id: 'other', position: { x: 780, y: 230 }, size: { width: 338, height: 120 } }
-    ], 'origin', 'target');
-
-    expect(layout.get('origin')).toEqual({ x: 0, y: 0 });
-    expect(layout.get('target')).toEqual({ x: 720, y: 96 });
-    expect(layout.get('other')).toEqual({ x: 1108, y: 230 });
-  });
-
-  it('reserves ordered inspection slots for a pinned target and a second hovered target', () => {
-    const layout = moveInspectionTargetsNearOrigins([
-      { id: 'origin', position: { x: 0, y: 0 }, size: { width: 660, height: 560 } },
-      { id: 'pinned', position: { x: 710, y: -90 }, size: { width: 338, height: 120 } },
-      { id: 'hovered', position: { x: 710, y: 90 }, size: { width: 338, height: 120 } },
-      { id: 'other', position: { x: 710, y: 270 }, size: { width: 338, height: 120 } }
-    ], [
-      { originNodeId: 'origin', targetNodeId: 'pinned' },
-      { originNodeId: 'origin', targetNodeId: 'hovered' }
+      { id: 'first', position: { x: 710, y: -183 }, size: { width: 338, height: 120 } },
+      { id: 'second', position: { x: 710, y: 0 }, size: { width: 338, height: 120 } },
+      { id: 'third', position: { x: 710, y: 183 }, size: { width: 338, height: 120 } },
+      { id: 'far-column', position: { x: 1259, y: 0 }, size: { width: 338, height: 120 } }
+    ];
+    const layout = reorderRecentTargetsInGrid(boxes, [
+      { originNodeId: 'origin', targetNodeId: 'third' },
+      { originNodeId: 'origin', targetNodeId: 'second' },
+      { originNodeId: 'origin', targetNodeId: 'first' }
     ]);
 
-    expect(layout.get('pinned')).toEqual({ x: 720, y: 96 });
-    expect(layout.get('hovered')).toEqual({ x: 720, y: 240 });
-    expect(layout.get('other')).toEqual({ x: 1108, y: 270 });
+    expect(layout.get('third')).toEqual({ x: 710, y: 0 });
+    expect(layout.get('second')).toEqual({ x: 710, y: -183 });
+    expect(layout.get('first')).toEqual({ x: 710, y: 183 });
+    expect(layout.get('far-column')).toEqual({ x: 1259, y: 0 });
+    expect(new Set(['first', 'second', 'third'].map(id => layout.get(id)?.y))).toEqual(new Set([-183, 0, 183]));
+  });
+
+  it('moves a target only among the bounded cells of its existing column', () => {
+    const layout = reorderRecentTargetsInGrid([
+      { id: 'origin', position: { x: 0, y: 183 }, size: { width: 660, height: 560 } },
+      { id: 'near', position: { x: 1098, y: -366 }, size: { width: 338, height: 120 } },
+      { id: 'target', position: { x: 1098, y: 366 }, size: { width: 338, height: 120 } },
+      { id: 'middle', position: { x: 1098, y: 183 }, size: { width: 338, height: 120 } }
+    ], [{ originNodeId: 'origin', targetNodeId: 'target' }]);
+
+    expect(layout.get('target')).toEqual({ x: 1098, y: 183 });
+    expect(layout.get('middle')).toEqual({ x: 1098, y: 366 });
+    expect(Math.min(...[...layout.values()].map(point => point.y))).toBe(-366);
+    expect(Math.max(...[...layout.values()].map(point => point.y))).toBe(366);
+  });
+
+  it('locks a node top-left to its column without clipping its own dimensions', () => {
+    const positions = new Map([
+      ['top', { x: 710, y: -183 }],
+      ['middle', { x: 710, y: 0 }],
+      ['bottom', { x: 710, y: 183 }],
+      ['other-column', { x: 1259, y: 500 }]
+    ]);
+
+    expect(gridColumnExtent(positions, positions.get('middle')!, { width: 338, height: 120 })).toEqual([
+      [710, -183],
+      [1048, 303]
+    ]);
   });
 });

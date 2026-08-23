@@ -33,8 +33,8 @@ The first release targets desktop VS Code and workspace extension hosts used by 
 - Every Function Node has lower-case, text-only **in** and **out** direction toggles. The first click resolves and shows all direct relationships in that direction up to the graph limit; the active button is highlighted. A second click removes that direction's branch from the canvas, and another click restores the cached branch immediately.
 - A collapsed Function Node contains its Function/name header and **in**/**Source**/**out** actions without a separate signature-summary row. Full source text remains available through Source Expansion.
 - Removing a branch retains any node that remains reachable through another visible relationship, preventing shared and cyclic nodes from disappearing incorrectly.
-- Existing nodes keep their baseline positions. Expanding source temporarily pushes overlapping nodes and compact right-hand columns aside using the measured expanded size; collapsing source restores the vacated space. User-dragged baseline positions are never overwritten by later relationship expansion or refresh.
-- Nodes are draggable only from their header. The remaining node surface uses the default cursor, selectable Source Expansion uses the text cursor, and controls and source relationships use the pointer cursor.
+- Nodes occupy fixed rank columns and bounded vertical row cells. Expanding source temporarily pushes overlapping nodes and whole compact right-hand columns aside using the measured expanded size; collapsing source restores the grid.
+- Nodes are draggable only from their header and only vertically inside their existing column bounds. Releasing a drag snaps the column ordering back onto legal cells. The remaining node surface uses the default cursor, selectable Source Expansion uses the text cursor, and controls and source relationships use the pointer cursor.
 - Struct and Enum association expansion admits at most 50 new Function Nodes at a time and exposes **Load more** when additional methods exist.
 - The default graph limit is 250 nodes and is configurable.
 - Standard-library and Cargo-dependency functions appear as dimmed leaf nodes by default.
@@ -45,15 +45,16 @@ The first release targets desktop VS Code and workspace extension hosts used by 
 - The idle graph has no visible arrows.
 - Hovering a node reveals all incident Call and Reference Edges.
 - Selecting a node pins its incident edges. Selecting a source relationship pins only that exact edge; selecting a different source relationship replaces the prior pinned edge and clears the prior graph-node selection. Selecting the same relationship again or pressing `Escape` dismisses it.
-- While an exact source relationship is pinned, aggregate Function Node hover is suppressed. Its target remains in the nearby inspection slot after pointer leave. Hovering another exact source relationship temporarily adds that edge and a second inspection slot without moving the pinned target.
-- Expanding or collapsing Source on the pinned target preserves the exact edge and inspection slot while reflowing for the target's measured size. Collapsing the origin Source dismisses the pin because its Call Site or Function Reference is no longer visible.
+- While an exact source relationship is pinned, aggregate Function Node hover is suppressed. Its target remains in its recent grid position after pointer leave. Hovering another exact source relationship temporarily adds only that edge and promotes its target to the nearest legal cell.
+- Expanding or collapsing Source on the pinned target preserves the exact edge and recent grid ordering while reflowing for the target's measured size. Collapsing the origin Source dismisses the pin because its Call Site or Function Reference is no longer visible.
 - An expanded Function Node shows the complete read-only source definition.
 - Every source-backed Call Site and Function Reference has a rectangular highlight.
 - When a provider reports a qualified Rust path such as `std::fs::read_to_string`, the path remains continuously typeset and only the terminal function identifier is highlighted. Source relationships contain no inline jump icon or icon spacing.
 - Hovering a highlighted source range reveals only its exact edge to the target Function Node.
 - An exact source endpoint follows the function name while its right edge is visible. If a long function name extends beyond the Source Expansion viewport, the endpoint is clamped to the visible right boundary and is recalculated during horizontal scrolling.
 - Exact source edges render below Function Nodes. Scrolling continues to update the exact source endpoint, but the routed line remains visually occluded by Source Expansion and node controls until it exits the node boundary.
-- While a Call Site or Function Reference is hovered, its target Function Node temporarily moves into a collision-free inspection slot beside the expanded source node. Leaving restores the layout unless the relationship is pinned; a pinned target holds the first inspection slot until dismissed or replaced, while a distinct hover uses the next slot.
+- Hovering a Call Site or Function Reference records that relationship target as most recent. Within each existing target column, the newest target receives the row cell vertically closest to the expanded source, and older inspected targets occupy progressively farther cells. Leaving removes the temporary edge but preserves this recent ordering. Repeated hover promotes an existing target without duplication; hovering from another source starts a new recent sequence.
+- Relationship-driven movement never changes a node's rank column, never creates a coordinate outside the column's current row bounds, and never changes the set of occupied cells. Source Expansion may still shift a complete column or open measured vertical clearance to prevent overlap.
 - Source Expansion does not change aggregate node-edge geometry: node hover or node pin routes every incident edge through the Function Node's right-side endpoint. Hovering or pinning an exact Call Site or Function Reference temporarily routes only that edge through its source-range endpoint.
 - Source syntax uses rust-analyzer semantic tokens and a dedicated palette derived from current VS Code theme chart colors rather than Explorer symbol-icon colors, which may equal ordinary editor text. A local lexical fallback colors Rust keywords, booleans, numbers, strings, character literals, comments, and lifetimes when the provider omits those ranges; overlapping provider tokens remain authoritative. The fallback never resolves program identity or relationships. The initial viewport maintains a readable zoom floor; **Fit** remains available for a complete overview.
 - Pausing over a semantic source token requests hover information from the active VS Code language provider at the token's real workspace URI and position. Rust signatures and documentation appear in a delayed, theme-aware, non-executable hover card.
@@ -71,7 +72,7 @@ The first release targets desktop VS Code and workspace extension hosts used by 
 ## Refresh and state
 
 - Changes to Rust documents already represented in the graph trigger a 600 ms debounced reanalysis.
-- Reanalysis preserves source expansion, relationship expansion, pinned relationships, navigation history, viewport, and manual positions whenever their source identities still exist.
+- Reanalysis preserves source expansion, relationship expansion, pinned relationships, navigation history, viewport, and legal grid ordering whenever their source identities still exist.
 - A toolbar **Refresh** command performs the same reconciliation immediately.
 - Removed or no-longer-resolvable nodes disappear with a non-blocking status announcement.
 
@@ -93,19 +94,20 @@ The first release targets desktop VS Code and workspace extension hosts used by 
 6. Node right-click → **Open Source in VS Code** opens the correct URI and selects the definition.
 7. Direct recursion and a two-function cycle never duplicate Function Nodes.
 8. Struct and Enum Type Nodes reveal their associated functions; Enum variants remain labels rather than nodes.
-9. An edit to a represented Rust function refreshes its relationships without losing manual node positions or expanded source.
+9. An edit to a represented Rust function refreshes its relationships without losing legal grid ordering or expanded source.
 10. Limits, dependency leaves, missing source, provider absence, cancellation, and non-function invocation fail visibly without leaving a misleading partial graph.
 11. The extension compiles, passes unit and integration tests, and packages as an installable VSIX.
 12. **in**/**out** are icon-free toggles whose visual highlight and `aria-pressed` state agree; toggling off removes only that direction's canvas branch and toggling on restores it.
-13. Hovering a source relationship moves only its target node into the nearby inspection slot, and mouse leave restores the prior layout exactly.
+13. Hovering source relationships keeps every node in its existing rank column, promotes the newest target to the nearest row cell, and pushes older recent targets progressively farther without changing the column's occupied-cell set.
 14. With a source relationship pinned, moving onto the surrounding expanded Function Node leaves only the exact pinned edge visible; an exact hover may add one temporary edge but unrelated node edges remain hidden.
-15. Collapsed-node whitespace is reduced by half, and an expanded source node creates collision-free horizontal room without changing persisted baseline positions.
-16. Clicking a source relationship keeps its target in the nearby inspection slot after mouse leave; hovering a second relationship adds a temporary second slot, and dismissing or replacing focus restores the displaced target.
+15. Collapsed-node whitespace is reduced by half, and an expanded source node creates collision-free horizontal room while relationship-driven reordering remains vertically bounded.
+16. Clicking a source relationship keeps its target in its recent grid position after mouse leave; hovering or clicking another relationship promotes the new target while older recent targets move to progressively farther cells.
 17. A source relationship whose function name exceeds the Source Expansion width never places its edge endpoint outside the visible source boundary, including before and after horizontal scrolling.
 18. Hovering a semantic source token displays the active Rust language provider's signature/documentation without changing Graph Focus; relationship hover and left-click keep their graph behavior while that information is available.
-19. Expanding or collapsing Source on a relationship-focused target does not return it to its baseline column; hiding the origin Source clears the relationship focus.
+19. Expanding or collapsing Source on a relationship-focused target preserves its recent grid ordering; hiding the origin Source clears the relationship focus.
 20. Hovering a node body never presents a drag cursor; dragging begins only from its header, while expanded source remains text-selectable and interactive elements retain a pointer cursor.
 21. Scrolling a pinned source relationship updates its exact endpoint without drawing the edge above Source Expansion, action buttons, or any other Function Node surface.
 22. Rust keywords and lexical literals receive theme-aware syntax color even when the active semantic provider omits those token ranges, without overriding overlapping semantic tokens.
 23. Function Nodes do not render a signature-summary row between the header and actions; the function name, navigation controls, direction controls, and Source Expansion remain available.
 24. Source keywords remain visibly different from ordinary text when a theme assigns the same foreground to Explorer keyword icons and editor text; all syntax categories use a dedicated theme-aware source palette.
+25. Header dragging cannot cross a rank column or its outer row bounds, and release snaps the reordered nodes onto valid grid cells.

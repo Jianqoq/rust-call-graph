@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.15
+
+- Function and Type Nodes now occupy fixed rank columns and bounded vertical grid cells instead of free-form inspection coordinates.
+- Hovering or selecting a source relationship promotes its target to the nearest cell; previously inspected targets move progressively farther in recent-access order and retain that order after pointer leave.
+- Header dragging is constrained to the current column and its outer rows, then snaps the reordered column back onto valid cells at release.
+- Corrected React Flow node extents to include node dimensions, preventing expanded nodes from being shifted left by their own width.
+
 ## 0.1.14
 
 - Source Expansion no longer uses Explorer symbol-icon colors for Rust syntax tokens; themes can legitimately make those colors identical to ordinary editor text.
