@@ -177,11 +177,14 @@ export function reorderRecentTargetsInGrid(
 
   for (const columnX of targetColumns) {
     const columnNodes = nodes.filter(node => sameColumn(node.position.x, columnX));
+    const movableColumnNodes = sameColumn(origin.position.x, columnX)
+      ? columnNodes.filter(node => node.id !== origin.id)
+      : columnNodes;
     const columnTargetIds = recentTargetIds.filter(id => {
       const target = nodes.find(node => node.id === id);
       return target !== undefined && sameColumn(target.position.x, columnX);
     });
-    const nearestCells = columnNodes
+    const nearestCells = movableColumnNodes
       .map(node => ({ ...node.position }))
       .sort((left, right) =>
         Math.abs(left.y - origin.position.y) - Math.abs(right.y - origin.position.y)
@@ -197,11 +200,11 @@ export function reorderRecentTargetsInGrid(
       assignedCellKeys.add(pointKey(cell));
     }
 
-    const remainingCells = columnNodes
+    const remainingCells = movableColumnNodes
       .map(node => ({ ...node.position }))
       .filter(cell => !assignedCellKeys.has(pointKey(cell)))
       .sort((left, right) => left.y - right.y);
-    const remainingNodes = columnNodes
+    const remainingNodes = movableColumnNodes
       .filter(node => !columnTargetIds.includes(node.id))
       .sort((left, right) => left.position.y - right.position.y || left.id.localeCompare(right.id));
     for (const [index, node] of remainingNodes.entries()) {

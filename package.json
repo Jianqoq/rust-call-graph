@@ -2,7 +2,7 @@
   "name": "rust-call-graph",
   "displayName": "Rust Call Graph",
   "description": "Explore source-backed Rust call and function-reference graphs inside VS Code.",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "publisher": "rust-call-graph",
   "type": "module",
   "license": "MIT",
