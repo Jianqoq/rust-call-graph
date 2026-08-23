@@ -169,19 +169,6 @@ describe('layoutGraph', () => {
     expect(Math.max(...[...layout.values()].map(point => point.y))).toBe(366);
   });
 
-  it('keeps the expanded relationship origin anchored when its target shares the same column', () => {
-    const layout = reorderRecentTargetsInGrid([
-      { id: 'top', position: { x: 549, y: -366 }, size: { width: 338, height: 120 } },
-      { id: 'peer', position: { x: 549, y: -183 }, size: { width: 338, height: 120 } },
-      { id: 'target', position: { x: 549, y: 0 }, size: { width: 338, height: 120 } },
-      { id: 'origin', position: { x: 549, y: 183 }, size: { width: 660, height: 560 } }
-    ], [{ originNodeId: 'origin', targetNodeId: 'top' }]);
-
-    expect(layout.get('origin')).toEqual({ x: 549, y: 183 });
-    expect(layout.get('top')).toEqual({ x: 549, y: 0 });
-    expect(new Set(['top', 'peer', 'target'].map(id => layout.get(id)?.y))).toEqual(new Set([-366, -183, 0]));
-  });
-
   it('moves every cell in a column together during horizontal drag', () => {
     const positions = new Map([
       ['top', { x: 710, y: -183 }],

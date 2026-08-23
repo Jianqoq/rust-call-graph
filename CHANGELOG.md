@@ -1,11 +1,5 @@
 # Changelog
 
-## 0.1.18
-
-- Hovering a source relationship can no longer move the expanded origin Function Node when the relationship target shares its grid column.
-- The origin node and its row cell are reserved during recent-target permutation; only the other legal cells participate in target recency ordering.
-- Reverted the incorrect deepest-rank promotion approach so this fix does not rewrite graph-layer placement or historical column positions.
-
 ## 0.1.17
 
 - Aggregate fan-out Call Edges now share one rendered trunk per source and target column, eliminating the dark/bright bands caused by identical SVG segments being painted repeatedly.

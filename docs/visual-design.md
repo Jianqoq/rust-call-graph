@@ -10,8 +10,6 @@ Collapsed Function Nodes avoid repeating their full signature. The header carrie
 
 Recent target ordering is independent of transient edge visibility. Pointer leave hides the temporary exact edge but keeps the spatial history; a pin keeps that exact edge visible. Expanding a recent target may add measured clearance, but it remains in its rank column and returns to the same ordered grid when collapsed.
 
-An expanded source is a spatial anchor. Relationship hover may bring a same-column target closer, but it never lifts, lowers, or swaps the source node itself; the source's occupied cell is visually reserved while its neighboring cells permute.
-
 Edges are latent structure. The idle canvas communicates topology through node placement; hover and selection reveal only the relevant paths. Aggregate relationships always share the node's right-side origin, including during Source Expansion. A source highlight becomes a precise edge origin only while that exact Call Site or Function Reference is hovered or pinned, making the transition from text to graph feel mechanical and trustworthy. An exact pin owns visibility until dismissed or replaced, preventing the surrounding node hover from flooding the canvas with unrelated edges.
 
 Aggregate fan-out uses shared visual infrastructure rather than overpaint. Same-kind relationships leaving one node for one target column draw their common horizontal stem and vertical trunk exactly once, then separate into short target branches with individual arrowheads. Solid Call and dashed Reference trunks occupy adjacent lanes instead of merging; exact source-range edges remain singular so their source coordinates stay truthful.
