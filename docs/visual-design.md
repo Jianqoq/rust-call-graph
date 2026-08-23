@@ -18,7 +18,7 @@ Source endpoints remain spatially honest when identifiers are wider than the nod
 
 Language information appears as a restrained VS Code-native hover surface rather than turning Source Expansion into a second editor. The active token receives a quiet rectangular emphasis; after a short dwell, a compact card presents the provider's Rust signature and documentation. The card inherits editor hover colors, remains legible above the graph, and never steals the immediate call-edge response or the left-click relationship action.
 
-Syntax color uses a layered model: rust-analyzer semantic tokens own known ranges, while a non-semantic Rust lexer supplies only missing lexical categories such as keywords, literals, comments, and lifetimes. Both layers resolve through VS Code theme variables.
+Syntax color uses a layered model: rust-analyzer semantic tokens own known ranges, while a non-semantic Rust lexer supplies only missing lexical categories such as keywords, literals, comments, and lifetimes. Both layers resolve through a dedicated VS Code chart-color palette. Explorer symbol-icon colors are deliberately excluded because themes may make them identical to ordinary editor text, erasing syntax contrast inside Source Expansion.
 
 Motion is brief, functional, and optional. Focus transitions clarify where navigation landed, while reduced-motion mode replaces them with immediate positioning. Focus rings, labels, line patterns, and shape ensure every interaction remains understandable without animation or color.
 

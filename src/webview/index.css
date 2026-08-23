@@ -20,6 +20,14 @@
   --graph-hover: var(--vscode-list-hoverBackground, rgba(90, 167, 248, 0.1));
   --graph-selection: var(--vscode-list-activeSelectionBackground, rgba(54, 104, 154, 0.45));
   --graph-code-bg: var(--vscode-textCodeBlock-background, rgba(0, 0, 0, 0.22));
+  --graph-syntax-keyword: var(--vscode-charts-purple, #c586c0);
+  --graph-syntax-function: var(--vscode-charts-yellow, #dcdcaa);
+  --graph-syntax-type: color-mix(in srgb, var(--vscode-charts-blue, #4ec9b0) 58%, var(--vscode-charts-green, #4ec9b0));
+  --graph-syntax-variable: var(--vscode-charts-blue, #9cdcfe);
+  --graph-syntax-string: var(--vscode-charts-orange, #ce9178);
+  --graph-syntax-number: var(--vscode-charts-green, #b5cea8);
+  --graph-syntax-comment: color-mix(in srgb, var(--vscode-charts-green, #6a9955) 72%, var(--graph-muted));
+  --graph-syntax-attribute: var(--vscode-charts-yellow, #dcdcaa);
   --graph-shadow: 0 18px 48px rgba(0, 0, 0, 0.24), 0 2px 8px rgba(0, 0, 0, 0.18);
   --graph-radius: 9px;
 }
@@ -610,75 +618,63 @@ button:focus-visible,
 
 .source-semantic-keyword,
 .source-semantic-modifier {
-  color: var(--vscode-symbolIcon-keywordForeground, var(--graph-reference));
+  color: var(--graph-syntax-keyword);
 }
 
 .source-semantic-function,
-.source-semantic-macro {
-  color: var(--vscode-symbolIcon-functionForeground, var(--graph-warning));
-}
-
+.source-semantic-macro,
 .source-semantic-method {
-  color: var(--vscode-symbolIcon-methodForeground, var(--vscode-symbolIcon-functionForeground, var(--graph-warning)));
+  color: var(--graph-syntax-function);
 }
 
 .source-semantic-struct,
-.source-semantic-class {
-  color: var(--vscode-symbolIcon-structForeground, var(--vscode-symbolIcon-classForeground, var(--graph-type)));
-}
-
+.source-semantic-class,
 .source-semantic-enum,
 .source-semantic-interface,
 .source-semantic-type,
 .source-semantic-type-parameter,
-.source-semantic-lifetime {
-  color: var(--vscode-symbolIcon-interfaceForeground, var(--vscode-symbolIcon-typeParameterForeground, var(--graph-type)));
-}
-
-.source-semantic-enum-member {
-  color: var(--vscode-symbolIcon-enumeratorMemberForeground, var(--graph-call));
-}
-
+.source-semantic-lifetime,
 .source-semantic-namespace,
 .source-semantic-module {
-  color: var(--vscode-symbolIcon-namespaceForeground, var(--graph-type));
+  color: var(--graph-syntax-type);
 }
 
+.source-semantic-enum-member,
 .source-semantic-parameter,
 .source-semantic-variable,
-.source-semantic-self-keyword {
-  color: var(--vscode-symbolIcon-variableForeground, var(--graph-call));
-}
-
 .source-semantic-property,
 .source-semantic-field {
-  color: var(--vscode-symbolIcon-propertyForeground, var(--vscode-symbolIcon-fieldForeground, var(--graph-call)));
+  color: var(--graph-syntax-variable);
+}
+
+.source-semantic-self-keyword {
+  color: var(--graph-syntax-keyword);
 }
 
 .source-semantic-string,
 .source-semantic-regexp {
-  color: var(--vscode-symbolIcon-stringForeground, var(--graph-success));
+  color: var(--graph-syntax-string);
 }
 
 .source-semantic-number {
-  color: var(--vscode-symbolIcon-numberForeground, var(--graph-success));
+  color: var(--graph-syntax-number);
 }
 
 .source-semantic-boolean {
-  color: var(--vscode-symbolIcon-booleanForeground, var(--graph-call));
+  color: var(--graph-syntax-keyword);
 }
 
 .source-semantic-operator {
-  color: var(--vscode-symbolIcon-operatorForeground, var(--graph-text));
+  color: var(--graph-text);
 }
 
 .source-semantic-comment {
-  color: var(--vscode-editorCodeLens-foreground, var(--graph-muted));
+  color: var(--graph-syntax-comment);
 }
 
 .source-semantic-attribute,
 .source-semantic-decorator {
-  color: var(--vscode-symbolIcon-keyForeground, var(--graph-warning));
+  color: var(--graph-syntax-attribute);
 }
 
 .source-semantic-deprecated {

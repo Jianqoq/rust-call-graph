@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.14
+
+- Source Expansion no longer uses Explorer symbol-icon colors for Rust syntax tokens; themes can legitimately make those colors identical to ordinary editor text.
+- Added a dedicated, theme-aware source palette for visibly distinct keywords, functions, types, variables, strings, numbers, comments, attributes, and literals.
+
 ## 0.1.13
 
 - Removed the redundant function signature summary between the Function Node header and its **in**/**Source**/**out** controls.
