@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.18
+
+- Multi-hop Source browsing now keeps the promoted middle Function Node beside its parent: after `inspect` promotes `installed_exchange_plugin_directory`, hovering `current_exe` from the middle node's Source no longer returns the middle node to its baseline row.
+- A change of relationship origin retains history only when the new origin is a previously visited target, preserving the active browsing chain without carrying unrelated graph history into a new inspection.
+- Active-chain layouts are applied from the oldest origin to the newest, so each next-hop target is arranged relative to its origin's already promoted cell.
+
 ## 0.1.17
 
 - Aggregate fan-out Call Edges now share one rendered trunk per source and target column, eliminating the dark/bright bands caused by identical SVG segments being painted repeatedly.

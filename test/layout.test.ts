@@ -169,6 +169,22 @@ describe('layoutGraph', () => {
     expect(Math.max(...[...layout.values()].map(point => point.y))).toBe(366);
   });
 
+  it('keeps a promoted parent beside its source while arranging the next hop', () => {
+    const layout = reorderRecentTargetsInGrid([
+      { id: 'inspect', position: { x: 0, y: 0 }, size: { width: 660, height: 560 } },
+      { id: 'other-middle', position: { x: 710, y: 0 }, size: { width: 338, height: 120 } },
+      { id: 'installed', position: { x: 710, y: 183 }, size: { width: 660, height: 560 } },
+      { id: 'other-leaf', position: { x: 1259, y: 0 }, size: { width: 338, height: 120 } },
+      { id: 'current-exe', position: { x: 1259, y: 183 }, size: { width: 338, height: 120 } }
+    ], [
+      { originNodeId: 'installed', targetNodeId: 'current-exe' },
+      { originNodeId: 'inspect', targetNodeId: 'installed' }
+    ]);
+
+    expect(layout.get('installed')).toEqual({ x: 710, y: 0 });
+    expect(layout.get('current-exe')).toEqual({ x: 1259, y: 0 });
+  });
+
   it('moves every cell in a column together during horizontal drag', () => {
     const positions = new Map([
       ['top', { x: 710, y: -183 }],

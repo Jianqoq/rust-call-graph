@@ -48,11 +48,21 @@ describe('source relationship selection', () => {
     expect(history.map(item => item.targetNodeId)).toEqual(['third', 'second', 'first']);
   });
 
-  it('restarts recent-target ordering when hovering from another source node', () => {
-    const previous = { edgeId: 'edge:first', originNodeId: 'root', targetNodeId: 'first' };
-    const nextOrigin = { edgeId: 'edge:next', originNodeId: 'other-root', targetNodeId: 'next' };
+  it('retains an ancestor promotion when browsing from its source', () => {
+    const promotedChild = { edgeId: 'edge:child', originNodeId: 'root', targetNodeId: 'child' };
+    const grandchild = { edgeId: 'edge:grandchild', originNodeId: 'child', targetNodeId: 'grandchild' };
 
-    expect(promoteRecentRelationship([previous], nextOrigin)).toEqual([nextOrigin]);
+    expect(promoteRecentRelationship([promotedChild], grandchild)).toEqual([
+      grandchild,
+      promotedChild
+    ]);
+  });
+
+  it('restarts recent-target ordering for an unrelated source node', () => {
+    const previous = { edgeId: 'edge:first', originNodeId: 'root', targetNodeId: 'first' };
+    const unrelated = { edgeId: 'edge:next', originNodeId: 'other-root', targetNodeId: 'next' };
+
+    expect(promoteRecentRelationship([previous], unrelated)).toEqual([unrelated]);
   });
 
   it('promotes an already visited target without duplicating it', () => {
