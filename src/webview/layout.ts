@@ -157,28 +157,6 @@ export function reorderRecentTargetsInGrid(
   nodes: readonly LayoutBox[],
   relationships: readonly InspectionRelationship[]
 ): ReadonlyMap<string, Point> {
-  const originIds = relationships
-    .map(relationship => relationship.originNodeId)
-    .filter((id, index, ids) => ids.indexOf(id) === index)
-    .reverse();
-  let arranged = nodes.map(node => ({ ...node, position: { ...node.position } }));
-  for (const originId of originIds) {
-    const positions = reorderOneOriginTargets(
-      arranged,
-      relationships.filter(relationship => relationship.originNodeId === originId)
-    );
-    arranged = arranged.map(node => ({
-      ...node,
-      position: positions.get(node.id) ?? node.position
-    }));
-  }
-  return new Map(arranged.map(node => [node.id, node.position]));
-}
-
-function reorderOneOriginTargets(
-  nodes: readonly LayoutBox[],
-  relationships: readonly InspectionRelationship[]
-): ReadonlyMap<string, Point> {
   const positions = new Map(nodes.map(node => [node.id, { ...node.position }]));
   const newest = relationships[0];
   if (newest === undefined) {
