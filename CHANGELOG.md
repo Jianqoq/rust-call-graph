@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.18
+
+- Multi-hop Source browsing now preserves every earlier promoted node position: after `inspect` promotes `installed_exchange_plugin_directory`, hovering `current_exe` from the expanded middle node no longer returns that middle node to its baseline row.
+- Recent-target histories are retained per relationship origin and replayed from the oldest source to the newest, so each next hop starts from the already arranged position of its origin.
+- Reverted the two earlier incorrect fixes that changed call ranks or reserved only same-column origins; graph ranks and ordinary single-source ordering remain unchanged.
+
 ## 0.1.17
 
 - Aggregate fan-out Call Edges now share one rendered trunk per source and target column, eliminating the dark/bright bands caused by identical SVG segments being painted repeatedly.

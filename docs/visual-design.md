@@ -8,7 +8,7 @@ The Entry Function is visually anchored without becoming oversized. Incoming nod
 
 Collapsed Function Nodes avoid repeating their full signature. The header carries function identity and optional navigation, followed immediately by the compact direction and Source controls; full code belongs to Source Expansion.
 
-Recent target ordering is independent of transient edge visibility. Pointer leave hides the temporary exact edge but keeps the spatial history; a pin keeps that exact edge visible. Expanding a recent target may add measured clearance, but it remains in its rank column and returns to the same ordered grid when collapsed.
+Recent target ordering is independent of transient edge visibility. Pointer leave hides the temporary exact edge but keeps the spatial history; a pin keeps that exact edge visible. Expanding a recent target may add measured clearance, but it remains in its rank column and returns to the same ordered grid when collapsed. When that target becomes the source for another hop, earlier source arrangements are replayed first; the middle node therefore stays beside its prior origin while the next column responds.
 
 Edges are latent structure. The idle canvas communicates topology through node placement; hover and selection reveal only the relevant paths. Aggregate relationships always share the node's right-side origin, including during Source Expansion. A source highlight becomes a precise edge origin only while that exact Call Site or Function Reference is hovered or pinned, making the transition from text to graph feel mechanical and trustworthy. An exact pin owns visibility until dismissed or replaced, preventing the surrounding node hover from flooding the canvas with unrelated edges.
 

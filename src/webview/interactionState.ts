@@ -37,19 +37,16 @@ export function activeInspectionRelationships(
   return [pinned, hovered];
 }
 
-/** Keeps one source node's targets in newest-first browsing order. */
+/** Keeps every source node's targets in newest-first browsing order. */
 export function promoteRecentRelationship(
   history: readonly HoveredRelationship[],
   relationship: HoveredRelationship
 ): readonly HoveredRelationship[] {
-  if (history[0]?.originNodeId !== undefined && history[0].originNodeId !== relationship.originNodeId) {
-    return [relationship];
-  }
   return [
     relationship,
     ...history.filter(item =>
-      item.originNodeId === relationship.originNodeId
-      && item.targetNodeId !== relationship.targetNodeId
+      item.originNodeId !== relationship.originNodeId
+      || item.targetNodeId !== relationship.targetNodeId
     )
   ];
 }

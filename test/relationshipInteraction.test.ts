@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { sourceRelationshipNameRange } from '../src/shared/sourceRelationship.js';
 import { activeInspectionRelationships, clearNodeSelection, nextPinnedRelationship, pinnedRelationshipAfterSourceToggle, promoteRecentRelationship } from '../src/webview/interactionState.js';
+import { reorderRecentTargetsInGrid } from '../src/webview/layout.js';
 
 describe('source relationship selection', () => {
   it('replaces the previously pinned relationship when another function is clicked', () => {
@@ -48,11 +49,36 @@ describe('source relationship selection', () => {
     expect(history.map(item => item.targetNodeId)).toEqual(['third', 'second', 'first']);
   });
 
-  it('restarts recent-target ordering when hovering from another source node', () => {
+  it('starts a new source sequence without discarding prior source positions', () => {
     const previous = { edgeId: 'edge:first', originNodeId: 'root', targetNodeId: 'first' };
     const nextOrigin = { edgeId: 'edge:next', originNodeId: 'other-root', targetNodeId: 'next' };
 
-    expect(promoteRecentRelationship([previous], nextOrigin)).toEqual([nextOrigin]);
+    expect(promoteRecentRelationship([previous], nextOrigin)).toEqual([nextOrigin, previous]);
+  });
+
+  it('keeps a promoted middle node beside its origin while browsing from its source', () => {
+    const inspectToInstalled = {
+      edgeId: 'edge:installed',
+      originNodeId: 'inspect',
+      targetNodeId: 'installed'
+    };
+    const installedToCurrentExe = {
+      edgeId: 'edge:current-exe',
+      originNodeId: 'installed',
+      targetNodeId: 'current-exe'
+    };
+    let history = promoteRecentRelationship([], inspectToInstalled);
+    history = promoteRecentRelationship(history, installedToCurrentExe);
+    const positions = reorderRecentTargetsInGrid([
+      { id: 'inspect', position: { x: 0, y: 0 }, size: { width: 660, height: 560 } },
+      { id: 'middle-peer', position: { x: 549, y: 0 }, size: { width: 338, height: 120 } },
+      { id: 'installed', position: { x: 549, y: 183 }, size: { width: 660, height: 560 } },
+      { id: 'third-peer', position: { x: 1098, y: 0 }, size: { width: 338, height: 120 } },
+      { id: 'current-exe', position: { x: 1098, y: 183 }, size: { width: 338, height: 120 } }
+    ], history);
+
+    expect(positions.get('installed')).toEqual({ x: 549, y: 0 });
+    expect(positions.get('current-exe')).toEqual({ x: 1098, y: 0 });
   });
 
   it('promotes an already visited target without duplicating it', () => {

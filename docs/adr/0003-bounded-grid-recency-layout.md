@@ -1,6 +1,6 @@
 # Use bounded grid cells with recent-target ordering
 
-The Function Graph uses shared rank columns and a finite set of vertical row cells per column. Hovering or selecting a source relationship does not invent a temporary coordinate: it promotes that relationship's target into the legal cell closest to the source, while older Recent Targets take progressively farther cells. A new source starts a new recent sequence. Columns have movable horizontal positions, but an individual cell never moves sideways without its complete column.
+The Function Graph uses shared rank columns and a finite set of vertical row cells per column. Hovering or selecting a source relationship does not invent a temporary coordinate: it promotes that relationship's target into the legal cell closest to the source, while older Recent Targets take progressively farther cells. Each source keeps its own recent sequence. Multi-hop browsing composes those sequences from the oldest source to the newest, so a promoted target remains arranged when it becomes the next source. Columns have movable horizontal positions, but an individual cell never moves sideways without its complete column.
 
 ## Consequences
 
