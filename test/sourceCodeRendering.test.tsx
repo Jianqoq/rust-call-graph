@@ -142,4 +142,40 @@ describe('SourceCode relationship rendering', () => {
     expect(screen.getByText('workspace type')).toBeTruthy();
     expect(screen.getByText('Copy')).toBeTruthy();
   });
+
+  it('matches native VS Code hover chrome without provider or language labels', () => {
+    const text = 'fn inspect() {}';
+    const tokenStart = text.indexOf('inspect');
+    render(
+      <ReactFlowProvider>
+        <SourceCode
+          nodeId="fn:inspect"
+          source={{
+            text,
+            startLine: 0,
+            startCharacter: 0,
+            semanticTokens: [{ startOffset: tokenStart, endOffset: tokenStart + 7, tokenType: 'function', modifiers: [] }],
+            relationships: []
+          }}
+          sourceHover={{
+            nodeId: 'fn:inspect',
+            sourceOffset: tokenStart,
+            blocks: [
+              { kind: 'markdown', value: '```rust\nengine_worker::backtest_exchange\n```' },
+              { kind: 'markdown', value: '```rust\npub(crate) fn inspect() -> anyhow::Result<()>\n```' },
+              { kind: 'markdown', value: 'Go to [Result](command:show)' }
+            ]
+          }}
+          actions={actions}
+        />
+      </ReactFlowProvider>
+    );
+
+    fireEvent.mouseEnter(screen.getByText('inspect').closest('.source-hover-anchor') as HTMLElement);
+
+    const tooltip = screen.getByRole('tooltip');
+    expect(tooltip.querySelector('.source-language-hover-label')).toBeNull();
+    expect(tooltip.querySelector('.source-language-hover-language')).toBeNull();
+    expect(tooltip.querySelectorAll('.source-language-hover-code')).toHaveLength(1);
+  });
 });

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.19
+
+- Source language Hover now matches VS Code's compact content hierarchy: the custom `rust-analyzer` header and repeated `RUST` labels have been removed.
+- Consecutive rust-analyzer code fences are rendered as one continuous code region with no nested background, border, radius, or padding.
+- Long Rust signatures wrap inside the outer Hover surface instead of creating inner rectangular panels and horizontal scrollbars.
+
 ## 0.1.18
 
 - Multi-hop Source browsing now keeps the promoted middle Function Node beside its parent: after `inspect` promotes `installed_exchange_plugin_directory`, hovering `current_exe` from the middle node's Source no longer returns the middle node to its baseline row.

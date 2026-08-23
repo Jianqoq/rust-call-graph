@@ -34,18 +34,34 @@ export function SourceHoverCard({
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      <div className="source-language-hover-label">rust-analyzer</div>
       <div className="source-language-hover-content">
-        {blocks.flatMap((block, blockIndex) => {
-          const renderBlocks = block.kind === 'code'
-            ? [{ kind: 'code' as const, value: block.value, ...(block.language === undefined ? {} : { language: block.language }) }]
-            : parseHoverMarkdown(block.value);
-          return renderBlocks.map((item, itemIndex) => renderBlock(item, `${blockIndex}:${itemIndex}`));
-        })}
+        {mergeAdjacentCodeBlocks(blocks.flatMap(block => block.kind === 'code'
+          ? [{ kind: 'code' as const, value: block.value, ...(block.language === undefined ? {} : { language: block.language }) }]
+          : parseHoverMarkdown(block.value)
+        )).map((item, index) => renderBlock(item, String(index)))}
       </div>
     </aside>,
     document.body
   );
+}
+
+function mergeAdjacentCodeBlocks(blocks: readonly RenderBlock[]): readonly RenderBlock[] {
+  const merged: RenderBlock[] = [];
+  for (const block of blocks) {
+    const previous = merged.at(-1);
+    if (block.kind === 'code' && previous?.kind === 'code' && block.language === previous.language) {
+      merged[merged.length - 1] = {
+        kind: 'code',
+        value: `${previous.value ?? ''}\n${block.value ?? ''}`,
+        ...(block.language === undefined && previous.language === undefined
+          ? {}
+          : { language: block.language ?? previous.language })
+      };
+    } else {
+      merged.push(block);
+    }
+  }
+  return merged;
 }
 
 export function parseHoverMarkdown(value: string): readonly RenderBlock[] {
@@ -94,7 +110,6 @@ function renderBlock(block: RenderBlock, key: string): ReactNode {
   if (block.kind === 'code') {
     return (
       <pre className="source-language-hover-code" key={key}>
-        {block.language !== undefined && <span className="source-language-hover-language">{block.language}</span>}
         <code>{block.value}</code>
       </pre>
     );

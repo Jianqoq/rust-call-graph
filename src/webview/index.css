@@ -732,7 +732,7 @@ button:focus-visible,
 .source-language-hover {
   position: fixed;
   z-index: 1000;
-  width: min(430px, calc(100vw - 16px));
+  width: min(700px, calc(100vw - 16px));
   max-height: min(330px, calc(100vh - 16px));
   overflow: auto;
   color: var(--vscode-editorHoverWidget-foreground, var(--graph-text));
@@ -745,22 +745,8 @@ button:focus-visible,
   line-height: 1.5;
 }
 
-.source-language-hover-label {
-  position: sticky;
-  z-index: 1;
-  top: 0;
-  padding: 5px 10px;
-  color: var(--graph-muted);
-  background: color-mix(in srgb, var(--vscode-editorHoverWidget-background, var(--graph-panel-raised)) 96%, transparent);
-  border-bottom: 1px solid var(--vscode-editorHoverWidget-border, var(--graph-border));
-  font-size: 10px;
-  font-weight: 650;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
 .source-language-hover-content {
-  padding: 8px 10px 10px;
+  padding: 6px 8px 7px;
 }
 
 .source-language-hover-content p {
@@ -788,33 +774,23 @@ button:focus-visible,
 }
 
 .source-language-hover-code {
-  position: relative;
-  margin: 0 0 8px;
-  padding: 8px 10px;
-  overflow: auto;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  overflow-wrap: anywhere;
   color: var(--vscode-textPreformat-foreground, var(--graph-text));
-  background: var(--vscode-textCodeBlock-background, var(--graph-code-bg));
-  border: 1px solid color-mix(in srgb, var(--graph-border) 75%, transparent);
-  border-radius: 4px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   font-family: var(--vscode-editor-font-family, "Cascadia Code", Consolas, monospace);
   font-size: max(12px, var(--vscode-editor-font-size, 12px));
   line-height: 1.45;
-  white-space: pre;
+  white-space: pre-wrap;
 }
 
 .source-language-hover-code code {
   padding: 0;
   background: transparent;
-}
-
-.source-language-hover-language {
-  display: block;
-  margin-bottom: 4px;
-  color: var(--graph-muted);
-  font-family: var(--vscode-font-family, system-ui, sans-serif);
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
 }
 
 .source-language-hover-link {
