@@ -11,6 +11,7 @@ import type {
   TypeNodeDto
 } from '../shared/protocol.js';
 import { sourceRelationshipNameRange } from '../shared/sourceRelationship.js';
+import { isOpenableSourceScheme } from '../shared/functionExpansion.js';
 import type { GraphConfiguration } from './config.js';
 import type { RustLanguageService } from './languageService.js';
 import { relativeOffsets, rangesOverlap, stableRangeKey, toRangeDto } from './range.js';
@@ -63,7 +64,6 @@ export class GraphSession {
   private readonly expandedSources = new Set<string>();
   private revision = 0;
   private limitReached = false;
-  private includeDependencies: boolean;
 
   private constructor(
     private readonly language: RustLanguageService,
@@ -71,7 +71,6 @@ export class GraphSession {
     readonly rootItem: vscode.CallHierarchyItem,
     readonly rootId: string
   ) {
-    this.includeDependencies = configuration.includeDependencies;
   }
 
   static async create(
@@ -99,7 +98,6 @@ export class GraphSession {
         ...[...this.functions.values()].map(record => record.node)
       ] as GraphNodeDto[],
       edges: [...this.edges.values()],
-      includeDependencies: this.includeDependencies,
       limits: {
         nodeCount: this.nodeCount,
         maxNodes: this.configuration.maxNodes,
@@ -148,23 +146,6 @@ export class GraphSession {
     const source = await this.buildFunctionSource(record);
     record.node = { ...record.node, source };
     this.expandedSources.add(nodeId);
-    this.touch();
-  }
-
-  setIncludeDependencies(value: boolean): void {
-    if (this.includeDependencies === value) {
-      return;
-    }
-    this.includeDependencies = value;
-    for (const [id, record] of this.functions) {
-      if (record.node.external && record.node.incoming === 'unavailable') {
-        record.node = { ...record.node, incoming: 'idle' };
-      }
-      if (record.node.external && record.node.outgoing === 'unavailable') {
-        record.node = { ...record.node, outgoing: 'idle' };
-      }
-      this.functions.set(id, record);
-    }
     this.touch();
   }
 
@@ -233,11 +214,6 @@ export class GraphSession {
   ): Promise<void> {
     const record = this.functions.get(nodeId);
     if (record === undefined) {
-      return;
-    }
-    if (record.node.external && !this.includeDependencies) {
-      record.node = { ...record.node, [direction]: 'unavailable' };
-      this.touch();
       return;
     }
 
@@ -439,23 +415,21 @@ export class GraphSession {
       range: toRangeDto(item.range),
       selectionRange: toRangeDto(item.selectionRange),
       external,
-      sourceAvailable: item.uri.scheme === 'file' || item.uri.scheme === 'vscode-remote',
-      incoming: external && !this.includeDependencies ? 'unavailable' : 'idle',
-      outgoing: external && !this.includeDependencies ? 'unavailable' : 'idle',
+      sourceAvailable: isOpenableSourceScheme(item.uri.scheme),
+      incoming: 'idle',
+      outgoing: 'idle',
       hasMoreIncoming: false,
       hasMoreOutgoing: false
     };
     const record: FunctionRecord = { node, item };
     this.functions.set(id, record);
 
-    if (!external || this.includeDependencies) {
-      const owner = await this.findOwnerType(item);
-      if (owner !== undefined) {
-        const typeId = await this.addType(owner.catalog, owner.definition);
-        if (typeId !== undefined) {
-          record.node = { ...record.node, ownerTypeId: typeId };
-          this.addMembershipEdge(typeId, id);
-        }
+    const owner = await this.findOwnerType(item);
+    if (owner !== undefined) {
+      const typeId = await this.addType(owner.catalog, owner.definition);
+      if (typeId !== undefined) {
+        record.node = { ...record.node, ownerTypeId: typeId };
+        this.addMembershipEdge(typeId, id);
       }
     }
     return id;

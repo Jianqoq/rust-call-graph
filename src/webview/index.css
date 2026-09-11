@@ -206,8 +206,7 @@ button:focus-visible,
   background: var(--graph-border);
 }
 
-.toolbar-button,
-.dependency-switch {
+.toolbar-button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -221,8 +220,7 @@ button:focus-visible,
   cursor: pointer;
 }
 
-.toolbar-button:hover,
-.dependency-switch:hover {
+.toolbar-button:hover {
   background: var(--graph-hover);
   border-color: var(--graph-border);
 }
@@ -235,53 +233,6 @@ button:focus-visible,
 .toolbar-button svg {
   width: 14px;
   height: 14px;
-}
-
-.dependency-switch {
-  padding-right: 10px;
-  color: var(--graph-muted);
-}
-
-.dependency-switch[aria-checked="true"] {
-  color: var(--graph-text);
-}
-
-.switch-track {
-  position: relative;
-  width: 28px;
-  height: 16px;
-  background: var(--vscode-input-background, #333843);
-  border: 1px solid var(--graph-border);
-  border-radius: 999px;
-}
-
-.switch-thumb {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  display: grid;
-  place-items: center;
-  width: 10px;
-  height: 10px;
-  color: var(--vscode-button-foreground, white);
-  background: var(--graph-muted);
-  border-radius: 999px;
-  transition: transform 140ms ease, background 140ms ease;
-}
-
-.switch-thumb svg {
-  width: 7px;
-  height: 7px;
-}
-
-.dependency-switch[aria-checked="true"] .switch-track {
-  background: color-mix(in srgb, var(--graph-call) 35%, var(--graph-panel));
-  border-color: var(--graph-call);
-}
-
-.dependency-switch[aria-checked="true"] .switch-thumb {
-  background: var(--graph-call);
-  transform: translateX(12px);
 }
 
 .react-flow__node-rustNode,
@@ -1077,8 +1028,7 @@ button:focus-visible,
 
 @media (max-width: 760px) {
   .toolbar-button span,
-  .toolbar-divider,
-  .dependency-switch {
+  .toolbar-divider {
     display: none;
   }
 

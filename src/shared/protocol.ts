@@ -97,7 +97,6 @@ export interface GraphSnapshotDto {
   readonly rootId: string;
   readonly nodes: readonly GraphNodeDto[];
   readonly edges: readonly GraphEdgeDto[];
-  readonly includeDependencies: boolean;
   readonly limits: GraphLimitsDto;
 }
 
@@ -140,8 +139,7 @@ export type WebviewToHostMessage =
   | { readonly type: 'openSource'; readonly nodeId: string }
   | { readonly type: 'openDefinition'; readonly nodeId: string; readonly sourceOffset: number }
   | { readonly type: 'requestSourceHover'; readonly requestId: number; readonly nodeId: string; readonly sourceOffset: number }
-  | { readonly type: 'refresh' }
-  | { readonly type: 'setIncludeDependencies'; readonly value: boolean };
+  | { readonly type: 'refresh' };
 
 export function isWebviewToHostMessage(value: unknown): value is WebviewToHostMessage {
   if (typeof value !== 'object' || value === null || !('type' in value)) {
@@ -156,6 +154,5 @@ export function isWebviewToHostMessage(value: unknown): value is WebviewToHostMe
     || type === 'openSource'
     || type === 'openDefinition'
     || type === 'requestSourceHover'
-    || type === 'refresh'
-    || type === 'setIncludeDependencies';
+    || type === 'refresh';
 }

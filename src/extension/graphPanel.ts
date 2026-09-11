@@ -136,17 +136,6 @@ export class GraphPanel implements vscode.Disposable {
         case 'refresh':
           await this.refresh('refresh');
           break;
-        case 'setIncludeDependencies':
-          this.session.setIncludeDependencies(message.value);
-          await vscode.workspace.getConfiguration('rustCallGraph').update(
-            'includeDependencies',
-            message.value,
-            vscode.workspace.workspaceFile === undefined && vscode.workspace.workspaceFolders === undefined
-              ? vscode.ConfigurationTarget.Global
-              : vscode.ConfigurationTarget.Workspace
-          );
-          await this.postSnapshot('settings');
-          break;
       }
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);

@@ -18,7 +18,6 @@ import {
 } from '@xyflow/react';
 import {
   Braces,
-  Check,
   CircleAlert,
   Eraser,
   Focus,
@@ -723,16 +722,6 @@ function GraphToolbar({
       </button>
       <button type="button" className="toolbar-button" onClick={onRefresh} disabled={loading !== ''} title="Refresh analysis">
         <RefreshCw className={loading === '' ? '' : 'spin'} aria-hidden="true" /> <span>{loading || 'Refresh'}</span>
-      </button>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={snapshot.includeDependencies}
-        className="dependency-switch"
-        onClick={() => bridge.postMessage({ type: 'setIncludeDependencies', value: !snapshot.includeDependencies })}
-      >
-        <span className="switch-track"><span className="switch-thumb">{snapshot.includeDependencies && <Check aria-hidden="true" />}</span></span>
-        Dependencies
       </button>
     </div>
   );

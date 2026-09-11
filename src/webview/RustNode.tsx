@@ -120,6 +120,9 @@ function FunctionBody({ node, data }: { readonly node: FunctionNodeDto; readonly
           onClick={() => data.actions.toggleSource(node.id)}
           disabled={!node.sourceAvailable}
           aria-expanded={node.source !== undefined}
+          {...(node.sourceAvailable
+            ? {}
+            : { title: 'Standard-library source needs rust-src (rustup component add rust-src)' })}
         >
           <Code2 aria-hidden="true" />
           {node.source === undefined ? 'Source' : 'Hide source'}

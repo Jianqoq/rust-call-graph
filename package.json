@@ -69,11 +69,6 @@
           "maximum": 200,
           "description": "Maximum number of associated functions admitted by one Struct or Enum expansion."
         },
-        "rustCallGraph.includeDependencies": {
-          "type": "boolean",
-          "default": false,
-          "description": "Allow graph expansion into standard-library and Cargo dependency source when available."
-        },
         "rustCallGraph.refreshDebounceMs": {
           "type": "number",
           "default": 600,

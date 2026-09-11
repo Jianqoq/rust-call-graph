@@ -18,7 +18,6 @@ function snapshot(): GraphSnapshotDto {
   return {
     revision: 1,
     rootId: 'root',
-    includeDependencies: false,
     limits: { nodeCount: 4, maxNodes: 250, expansionBatchSize: 50, limitReached: false },
     nodes: [node('caller'), node('root', 'complete', 'complete'), node('callee'), node('shared')],
     edges: [

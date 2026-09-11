@@ -33,13 +33,6 @@ function createBrowserBridge(): VscodeApi {
         dispatchHostMessage({ type: 'graphSnapshot', snapshot: currentSnapshot, reason: 'initial' });
       } else if (message.type === 'refresh') {
         dispatchHostMessage({ type: 'announce', tone: 'info', message: 'Demo graph refreshed.' });
-      } else if (message.type === 'setIncludeDependencies') {
-        currentSnapshot = { ...currentSnapshot, includeDependencies: message.value };
-        dispatchHostMessage({
-          type: 'graphSnapshot',
-          snapshot: currentSnapshot,
-          reason: 'settings'
-        });
       } else if (message.type === 'toggleSource') {
         const sourceTemplate = demoSnapshot.nodes.find(node =>
           node.kind === 'function' && node.id === message.nodeId

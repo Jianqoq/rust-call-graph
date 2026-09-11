@@ -30,7 +30,6 @@ function semanticToken(
 export const demoSnapshot: GraphSnapshotDto = {
   revision: 1,
   rootId: 'fn:execute_order',
-  includeDependencies: false,
   limits: {
     nodeCount: 6,
     maxNodes: 250,

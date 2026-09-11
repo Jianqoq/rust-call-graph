@@ -3,7 +3,6 @@ import * as vscode from 'vscode';
 export interface GraphConfiguration {
   readonly maxNodes: number;
   readonly expansionBatchSize: number;
-  readonly includeDependencies: boolean;
   readonly refreshDebounceMs: number;
 }
 
@@ -16,7 +15,6 @@ export function readGraphConfiguration(): GraphConfiguration {
   return {
     maxNodes: boundedInteger(config.get<number>('maxNodes', 250), 25, 2000),
     expansionBatchSize: boundedInteger(config.get<number>('expansionBatchSize', 50), 10, 200),
-    includeDependencies: config.get<boolean>('includeDependencies', false),
     refreshDebounceMs: boundedInteger(config.get<number>('refreshDebounceMs', 600), 100, 5000)
   };
 }

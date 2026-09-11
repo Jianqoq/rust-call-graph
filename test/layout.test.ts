@@ -28,7 +28,6 @@ function snapshot(): GraphSnapshotDto {
   return {
     revision: 1,
     rootId: 'root',
-    includeDependencies: false,
     limits: { nodeCount: 4, maxNodes: 250, expansionBatchSize: 50, limitReached: false },
     nodes: [node('caller'), node('root'), node('callee'), node('cycle')],
     edges: [
@@ -59,7 +58,6 @@ describe('layoutGraph', () => {
     const compact: GraphSnapshotDto = {
       revision: 1,
       rootId: 'root',
-      includeDependencies: false,
       limits: { nodeCount: 3, maxNodes: 250, expansionBatchSize: 50, limitReached: false },
       nodes: [node('root'), node('first'), node('second')],
       edges: [
@@ -76,7 +74,6 @@ describe('layoutGraph', () => {
     const compact: GraphSnapshotDto = {
       revision: 1,
       rootId: 'root',
-      includeDependencies: false,
       limits: { nodeCount: 3, maxNodes: 250, expansionBatchSize: 50, limitReached: false },
       nodes: [node('root'), node('first'), node('second')],
       edges: [
