@@ -11,6 +11,12 @@ const RUST_KEYWORDS = new Set([
 
 const IDENTIFIER = /^[\p{ID_Start}_][\p{ID_Continue}_]*/u;
 const NUMBER = /^(?:0[xX][0-9A-Fa-f_]+|0[bB][01_]+|0[oO][0-7_]+|\d[\d_]*(?:\.\d[\d_]*)?(?:[eE][+-]?\d[\d_]*)?)(?:[A-Za-z][A-Za-z0-9_]*)?/;
+const PRIMITIVE_TYPES = new Set([
+  'bool', 'char', 'f32', 'f64', 'i8', 'i16', 'i32', 'i64', 'i128', 'isize',
+  'str', 'u8', 'u16', 'u32', 'u64', 'u128', 'usize'
+]);
+const FN_PREFIX_KEYWORDS = new Set(['async', 'const', 'extern', 'pub', 'safe', 'unsafe']);
+const BINDING_KEYWORDS = new Set(['const', 'let', 'static']);
 
 export function withRustSyntaxFallbacks(
   text: string,
@@ -26,11 +32,15 @@ export function withRustSyntaxFallbacks(
 export function rustSyntaxFallbackTokens(text: string): readonly SourceSemanticTokenDto[] {
   const tokens: SourceSemanticTokenDto[] = [];
   let index = 0;
+  let expectFunctionName = false;
+  let expectVariableName = false;
 
   while (index < text.length) {
     const commentEnd = scanComment(text, index);
     if (commentEnd !== undefined) {
       tokens.push(token(index, commentEnd, 'comment'));
+      expectFunctionName = false;
+      expectVariableName = false;
       index = commentEnd;
       continue;
     }
@@ -48,6 +58,8 @@ export function rustSyntaxFallbackTokens(text: string): readonly SourceSemanticT
     const stringEnd = scanStringOrCharacter(text, index);
     if (stringEnd !== undefined) {
       tokens.push(token(index, stringEnd, 'string'));
+      expectFunctionName = false;
+      expectVariableName = false;
       index = stringEnd;
       continue;
     }
@@ -64,6 +76,8 @@ export function rustSyntaxFallbackTokens(text: string): readonly SourceSemanticT
     if (number !== undefined) {
       const end = index + number.length;
       tokens.push(token(index, end, 'number'));
+      expectFunctionName = false;
+      expectVariableName = false;
       index = end;
       continue;
     }
@@ -73,15 +87,44 @@ export function rustSyntaxFallbackTokens(text: string): readonly SourceSemanticT
       const end = index + identifier.length;
       if (identifier === 'true' || identifier === 'false') {
         tokens.push(token(index, end, 'boolean'));
+        expectFunctionName = false;
+        expectVariableName = false;
       } else if (identifier === 'self') {
         tokens.push(token(index, end, 'selfKeyword'));
+        expectFunctionName = false;
+        expectVariableName = false;
       } else if (identifier === 'Self' || RUST_KEYWORDS.has(identifier)) {
         tokens.push(token(index, end, 'keyword'));
+        if (identifier === 'fn') {
+          expectFunctionName = true;
+          expectVariableName = false;
+        } else if (BINDING_KEYWORDS.has(identifier)) {
+          expectFunctionName = false;
+          expectVariableName = true;
+        } else if (identifier !== 'mut' && !FN_PREFIX_KEYWORDS.has(identifier)) {
+          expectFunctionName = false;
+          expectVariableName = false;
+        }
+      } else if (expectFunctionName) {
+        tokens.push(token(index, end, 'function'));
+        expectFunctionName = false;
+        expectVariableName = false;
+      } else if (expectVariableName) {
+        tokens.push(token(index, end, 'variable'));
+        expectFunctionName = false;
+        expectVariableName = false;
+      } else if (PRIMITIVE_TYPES.has(identifier) || isTypeLikeIdentifier(identifier)) {
+        tokens.push(token(index, end, 'type'));
       }
       index = end;
       continue;
     }
 
+    const character = text[index] ?? '';
+    if (!/\s/u.test(character)) {
+      expectFunctionName = false;
+      expectVariableName = false;
+    }
     index += 1;
   }
 
@@ -147,6 +190,14 @@ function scanStringOrCharacter(text: string, start: number): number | undefined 
     index += 1;
   }
   return quote === '"' ? text.length : undefined;
+}
+
+function isTypeLikeIdentifier(identifier: string): boolean {
+  const first = [...identifier][0];
+  if (first === undefined || first.toUpperCase() !== first || first.toLowerCase() === first) {
+    return false;
+  }
+  return identifier.length === 1 || /[\p{Ll}]/u.test(identifier);
 }
 
 function token(startOffset: number, endOffset: number, tokenType: string): SourceSemanticTokenDto {

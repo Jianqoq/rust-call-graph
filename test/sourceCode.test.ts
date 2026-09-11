@@ -154,4 +154,29 @@ describe('buildSourceLines', () => {
     ]));
     expect(renderedTokens).not.toContainEqual({ text: 'type', tokenType: 'keyword' });
   });
+
+  it('colors hover-like Rust signatures with keywords, bindings, functions, and types', () => {
+    const source: FunctionSourceDto = {
+      text: 'let manifest: BTreeMap<String, String> = pub(crate) fn inspect() -> anyhow::Result<()>',
+      startLine: 0,
+      startCharacter: 0,
+      relationships: [],
+      semanticTokens: []
+    };
+
+    const renderedTokens = buildSourceLines(source).flatMap(line => line.segments.flatMap(segment => {
+      const semanticToken = (segment as { semanticToken?: { tokenType: string } }).semanticToken;
+      return semanticToken === undefined ? [] : [{ text: segment.text, tokenType: semanticToken.tokenType }];
+    }));
+
+    expect(renderedTokens).toEqual(expect.arrayContaining([
+      { text: 'let', tokenType: 'keyword' },
+      { text: 'manifest', tokenType: 'variable' },
+      { text: 'BTreeMap', tokenType: 'type' },
+      { text: 'String', tokenType: 'type' },
+      { text: 'fn', tokenType: 'keyword' },
+      { text: 'inspect', tokenType: 'function' },
+      { text: 'Result', tokenType: 'type' }
+    ]));
+  });
 });

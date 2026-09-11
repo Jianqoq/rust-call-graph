@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { SourceHoverBlockDto } from '../shared/protocol.js';
+import { highlightRustSegments, isRustHoverLanguage, semanticTokenClassName } from './sourceHighlight.js';
 
 export interface SourceHoverAnchor {
   readonly sourceOffset: number;
@@ -110,11 +111,22 @@ function renderBlock(block: RenderBlock, key: string): ReactNode {
   if (block.kind === 'code') {
     return (
       <pre className="source-language-hover-code" key={key}>
-        <code>{block.value}</code>
+        <code>{renderHoverCode(block.value ?? '', block.language)}</code>
       </pre>
     );
   }
   return <p key={key}>{renderInlineMarkdown(block.value ?? '')}</p>;
+}
+
+function renderHoverCode(value: string, language: string | undefined): ReactNode {
+  if (!isRustHoverLanguage(language)) {
+    return value;
+  }
+  return highlightRustSegments(value).map((segment, index) => (
+    segment.token === undefined
+      ? <Fragment key={index}>{segment.text}</Fragment>
+      : <span className={semanticTokenClassName(segment.token)} key={index}>{segment.text}</span>
+  ));
 }
 
 function renderInlineMarkdown(value: string): readonly ReactNode[] {

@@ -8,6 +8,7 @@ import type {
 import type { NodeActions, SourceHoverData } from './graphTypes.js';
 import { SourceHoverCard, type SourceHoverAnchor } from './SourceHoverCard.js';
 import { withRustSyntaxFallbacks } from './rustSyntaxFallback.js';
+import { semanticTokenClassName } from './sourceHighlight.js';
 
 interface SourceCodeProps {
   readonly nodeId: string;
@@ -372,12 +373,4 @@ export function buildSourceLines(source: FunctionSourceDto): readonly SourceLine
     lines.push({ number: source.startLine + lineIndex + 1, segments });
   }
   return lines;
-}
-
-function semanticTokenClassName(token: SourceSemanticTokenDto): string {
-  const tokenType = token.tokenType.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
-  const modifiers = token.modifiers.map(modifier =>
-    `source-semantic-${modifier.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()}`
-  );
-  return ['source-semantic', `source-semantic-${tokenType}`, ...modifiers].join(' ');
 }

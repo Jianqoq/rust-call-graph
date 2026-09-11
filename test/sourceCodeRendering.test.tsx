@@ -152,10 +152,56 @@ describe('SourceCode relationship rendering', () => {
 
     fireEvent.mouseEnter(screen.getByText('Widget').closest('.source-hover-anchor') as HTMLElement);
 
-    expect(screen.getByRole('tooltip')).toBeTruthy();
-    expect(screen.getByText('struct Widget')).toBeTruthy();
+    const tooltip = screen.getByRole('tooltip');
+    expect(tooltip.querySelector('.source-language-hover-code')?.textContent).toBe('struct Widget');
+    expect(tooltip.querySelector('.source-semantic-keyword')?.textContent).toBe('struct');
+    expect(tooltip.querySelector('.source-semantic-type')?.textContent).toBe('Widget');
     expect(screen.getByText('workspace type')).toBeTruthy();
     expect(screen.getByText('Copy')).toBeTruthy();
+  });
+
+  it('syntax-highlights hover Rust code instead of rendering it as one preformat color', () => {
+    const text = 'fn load(manifest: BTreeMap<String, String>) {}';
+    const tokenStart = text.indexOf('manifest');
+    render(
+      <ReactFlowProvider>
+        <SourceCode
+          nodeId="fn:load"
+          source={{
+            text,
+            startLine: 0,
+            startCharacter: 0,
+            semanticTokens: [{ startOffset: tokenStart, endOffset: tokenStart + 8, tokenType: 'variable', modifiers: [] }],
+            relationships: []
+          }}
+          sourceHover={{
+            nodeId: 'fn:load',
+            sourceOffset: tokenStart,
+            blocks: [
+              { kind: 'code', language: 'rust', value: 'let manifest: BTreeMap<String, String>' }
+            ]
+          }}
+          actions={actions}
+        />
+      </ReactFlowProvider>
+    );
+
+    fireEvent.mouseEnter(screen.getByText((_content, element) =>
+      element?.classList.contains('source-hover-anchor') === true
+      && element.textContent === 'manifest'
+    ));
+
+    const tooltip = screen.getByRole('tooltip');
+    const highlighted = [...tooltip.querySelectorAll('[class*="source-semantic-"]')].map(node => ({
+      text: node.textContent,
+      className: node.className
+    }));
+    expect(highlighted).toEqual(expect.arrayContaining([
+      expect.objectContaining({ text: 'let', className: expect.stringContaining('source-semantic-keyword') }),
+      expect.objectContaining({ text: 'manifest', className: expect.stringContaining('source-semantic-variable') }),
+      expect.objectContaining({ text: 'BTreeMap', className: expect.stringContaining('source-semantic-type') }),
+      expect.objectContaining({ text: 'String', className: expect.stringContaining('source-semantic-type') })
+    ]));
   });
 
   it('matches native VS Code hover chrome without provider or language labels', () => {

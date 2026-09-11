@@ -812,7 +812,7 @@ button:focus-visible,
   padding: 0;
   overflow: visible;
   overflow-wrap: anywhere;
-  color: var(--vscode-textPreformat-foreground, var(--graph-text));
+  color: var(--vscode-editor-foreground, var(--graph-text));
   background: transparent;
   border: 0;
   border-radius: 0;
@@ -824,6 +824,7 @@ button:focus-visible,
 
 .source-language-hover-code code {
   padding: 0;
+  color: inherit;
   background: transparent;
 }
 

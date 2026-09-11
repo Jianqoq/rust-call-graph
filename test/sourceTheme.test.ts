@@ -21,4 +21,13 @@ describe('Source Expansion token palette', () => {
     expect(rule).toMatch(/white-space:\s*pre-wrap/);
     expect(rule).toMatch(/overflow-wrap:\s*anywhere/);
   });
+
+  it('colors hover code fences with editor syntax colors instead of markdown preformat gold', () => {
+    const rule = /\.source-language-hover-code\s*\{([^}]*)\}/.exec(stylesheet)?.[1] ?? '';
+    const nested = /\.source-language-hover-code code\s*\{([^}]*)\}/.exec(stylesheet)?.[1] ?? '';
+
+    expect(rule).toMatch(/color:\s*var\(--vscode-editor-foreground/);
+    expect(rule).not.toMatch(/textPreformat-foreground/);
+    expect(nested).toMatch(/color:\s*inherit/);
+  });
 });
