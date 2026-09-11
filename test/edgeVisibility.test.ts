@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FunctionNodeDto, GraphEdgeDto } from '../src/shared/protocol.js';
-import { edgeIsVisible, edgeSourceHandleId, nodeHoverEdgeTarget } from '../src/webview/edgeVisibility.js';
+import { edgeIsVisible, edgeRevealMode, edgeStrokeStyle, nodeHoverEdgeTarget } from '../src/webview/edgeVisibility.js';
 
 const position = { line: 0, character: 0 };
 const range = { start: position, end: position };
@@ -35,20 +35,6 @@ describe('nodeHoverEdgeTarget', () => {
   });
 });
 
-describe('edgeSourceHandleId', () => {
-  it('uses the node endpoint for aggregate edges even when source ranges exist', () => {
-    expect(edgeSourceHandleId('call', true, false)).toBe('source');
-  });
-
-  it('uses the exact source range only during an exact source interaction', () => {
-    expect(edgeSourceHandleId('call', true, true)).toBe('source-call');
-  });
-
-  it('falls back to the node endpoint when no source range exists', () => {
-    expect(edgeSourceHandleId('call', false, true)).toBe('source');
-  });
-});
-
 describe('edgeIsVisible', () => {
   const selected: GraphEdgeDto = { id: 'selected', source: 'root', target: 'first', kind: 'call' };
   const sibling: GraphEdgeDto = { id: 'sibling', source: 'root', target: 'second', kind: 'call' };
@@ -72,5 +58,54 @@ describe('edgeIsVisible', () => {
     expect(edgeIsVisible(selected, state)).toBe(true);
     expect(edgeIsVisible(sibling, state)).toBe(true);
     expect(edgeIsVisible(unrelated, state)).toBe(false);
+  });
+});
+
+describe('edgeRevealMode', () => {
+  const call: GraphEdgeDto = { id: 'call', source: 'root', target: 'first', kind: 'call' };
+
+  it('treats hovered function edges as a preview until the function is selected', () => {
+    expect(edgeRevealMode(call, { hoveredNodeId: 'root', pinnedEdgeIds: new Set() })).toBe('preview');
+  });
+
+  it('keeps selected function edges selected even while the pointer stays on the node', () => {
+    expect(edgeRevealMode(call, {
+      hoveredNodeId: 'root',
+      pinnedNodeId: 'root',
+      pinnedEdgeIds: new Set()
+    })).toBe('selected');
+  });
+
+  it('keeps a pinned relationship selected while an extra hovered relationship stays a preview', () => {
+    const sibling: GraphEdgeDto = { id: 'sibling', source: 'root', target: 'second', kind: 'call' };
+    const state = {
+      hoveredNodeId: 'root',
+      hoveredEdgeId: 'sibling',
+      pinnedEdgeIds: new Set(['call'])
+    };
+    expect(edgeRevealMode(call, state)).toBe('selected');
+    expect(edgeRevealMode(sibling, state)).toBe('preview');
+  });
+});
+
+describe('edgeStrokeStyle', () => {
+  it('draws selected calls as solid kind color and hover previews as dashed orange', () => {
+    expect(edgeStrokeStyle('call', 'selected')).toEqual({
+      color: 'var(--graph-call)',
+      strokeWidth: 2
+    });
+    expect(edgeStrokeStyle('call', 'preview')).toEqual({
+      color: 'var(--graph-preview)',
+      strokeWidth: 2,
+      strokeDasharray: '6 6'
+    });
+  });
+
+  it('keeps selected references dashed in their kind color', () => {
+    expect(edgeStrokeStyle('reference', 'selected')).toEqual({
+      color: 'var(--graph-reference)',
+      strokeWidth: 2,
+      strokeDasharray: '7 5'
+    });
   });
 });

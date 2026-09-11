@@ -3,6 +3,7 @@ export interface FanOutEdgeCandidate {
   readonly sourceNodeId: string;
   readonly sourceHandleId: string;
   readonly kind: 'call' | 'reference';
+  readonly reveal: 'selected' | 'preview';
   readonly visible: boolean;
   readonly sourceX: number;
   readonly sourceY: number;
@@ -48,8 +49,8 @@ export function bundleFanOutEdges(
     if (family.length < 2) {
       continue;
     }
-    const styleGroups = (['call', 'reference'] as const)
-      .map(kind => family.filter(edge => edge.kind === kind))
+    const styleGroups = STYLE_GROUPS
+      .map(style => family.filter(edge => edge.kind === style.kind && edge.reveal === style.reveal))
       .filter(group => group.length > 0);
     for (const [styleIndex, group] of styleGroups.entries()) {
       const ordered = [...group].sort(
@@ -78,6 +79,13 @@ export function bundleFanOutEdges(
   }
   return bundles;
 }
+
+const STYLE_GROUPS = [
+  { kind: 'call', reveal: 'selected' },
+  { kind: 'call', reveal: 'preview' },
+  { kind: 'reference', reveal: 'selected' },
+  { kind: 'reference', reveal: 'preview' }
+] as const;
 
 function coordinateKey(value: number): string {
   return (Math.round(value * 2) / 2).toFixed(1);

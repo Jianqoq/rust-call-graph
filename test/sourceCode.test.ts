@@ -1,17 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FunctionSourceDto } from '../src/shared/protocol.js';
-import { buildSourceLines, clampedSourceHandleRightInset } from '../src/webview/SourceCode.js';
+import { buildSourceLines } from '../src/webview/SourceCode.js';
 import { semanticTokenClassName, isDefinitionNavigableToken, showsGotoDefinitionUnderline } from '../src/webview/sourceHighlight.js';
-
-describe('source relationship handle geometry', () => {
-  it('moves an overflowing long-name handle back to the source viewport boundary', () => {
-    expect(clampedSourceHandleRightInset(-5, 1101, 920, 0.5)).toBe(357);
-  });
-
-  it('keeps a handle at its function token when it already fits', () => {
-    expect(clampedSourceHandleRightInset(-5, 618, 920, 0.5)).toBe(-5);
-  });
-});
 
 describe('buildSourceLines', () => {
   it('keeps two calls to one function as independently addressable source ranges', () => {

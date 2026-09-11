@@ -34,13 +34,13 @@ import {
   type ComponentType,
   type MouseEvent as ReactMouseEvent
 } from 'react';
-import type { GraphEdgeDto, GraphSnapshotDto, HostToWebviewMessage } from '../shared/protocol.js';
+import type { GraphSnapshotDto, HostToWebviewMessage } from '../shared/protocol.js';
 import type { DefinitionClickModifier } from '../shared/definitionNavigation.js';
 import { bridge } from './bridge.js';
 import { applySyntaxPalette } from './syntaxPalette.js';
 import { BundledEdge } from './BundledEdge.js';
 import { bundleFanOutEdges, type FanOutEdgeCandidate } from './edgeBundling.js';
-import { edgeIsVisible, edgeSourceHandleId, nodeHoverEdgeTarget } from './edgeVisibility.js';
+import { edgeIsVisible, edgeRevealMode, edgeStrokeStyle, nodeHoverEdgeTarget } from './edgeVisibility.js';
 import { directionIsActive, directionKey, visibleGraph } from './graphView.js';
 import type { BaseFlowNode, HoveredRelationship, NodeActions, RustFlowNode, SourceHoverData } from './graphTypes.js';
 import { activeInspectionRelationships, clearNodeSelection, nextPinnedRelationship, pinnedRelationshipAfterSourceToggle, promoteRecentRelationship } from './interactionState.js';
@@ -401,19 +401,18 @@ function GraphSurface() {
       );
       return [node.id, { position: node.position, size }] as const;
     }));
+    const visibilityState = {
+      hoveredNodeId,
+      hoveredEdgeId,
+      pinnedNodeId,
+      pinnedEdgeIds
+    };
     const prepared = graphView.edges.map(edge => {
-      const visible = edgeIsVisible(edge, {
-        hoveredNodeId,
-        hoveredEdgeId,
-        pinnedNodeId,
-        pinnedEdgeIds
-      });
-      const anchored = sourceHasRelationship(snapshot, edge);
-      const exactSourceInteraction = hoveredEdgeId === edge.id || pinnedEdgeIds.has(edge.id);
-      const sourceHandle = edgeSourceHandleId(edge.id, anchored, exactSourceInteraction);
-      return { edge, visible, sourceHandle };
+      const visible = edgeIsVisible(edge, visibilityState);
+      const reveal = edgeRevealMode(edge, visibilityState) ?? 'preview';
+      return { edge, visible, reveal };
     });
-    const bundleCandidates: FanOutEdgeCandidate[] = prepared.flatMap(({ edge, visible, sourceHandle }) => {
+    const bundleCandidates: FanOutEdgeCandidate[] = prepared.flatMap(({ edge, visible, reveal }) => {
       if (edge.kind === 'membership') {
         return [];
       }
@@ -425,8 +424,9 @@ function GraphSurface() {
       return [{
         id: edge.id,
         sourceNodeId: edge.source,
-        sourceHandleId: sourceHandle,
+        sourceHandleId: 'source',
         kind: edge.kind,
+        reveal,
         visible,
         sourceX: source.position.x + source.size.width,
         sourceY: source.position.y + source.size.height / 2,
@@ -437,42 +437,34 @@ function GraphSurface() {
     });
     const bundles = bundleFanOutEdges(bundleCandidates);
 
-    return prepared.map(({ edge, visible, sourceHandle }) => {
-      const color = edge.kind === 'reference'
-        ? 'var(--graph-reference)'
-        : edge.kind === 'membership'
-          ? 'var(--graph-membership)'
-          : 'var(--graph-call)';
+    return prepared.map(({ edge, visible, reveal }) => {
+      const stroke = edgeStrokeStyle(edge.kind, reveal);
       const bundle = bundles.get(edge.id);
       return {
         id: edge.id,
         source: edge.source,
         target: edge.target,
-        sourceHandle,
+        sourceHandle: 'source',
         targetHandle: 'target',
         type: edge.kind === 'membership' ? 'smoothstep' : 'bundled',
         hidden: !visible,
         selectable: false,
         focusable: false,
         interactionWidth: 16,
-        zIndex: 0,
+        zIndex: reveal === 'selected' ? 1 : 0,
         ...(bundle === undefined ? {} : { data: { bundle } }),
         ...(edge.kind === 'membership' ? {} : {
           markerEnd: {
             type: MarkerType.ArrowClosed,
             width: 18,
             height: 18,
-            color
+            color: stroke.color
           }
         }),
         style: {
-          stroke: color,
-          strokeWidth: edge.kind === 'membership' ? 1.4 : 2,
-          ...(edge.kind === 'reference'
-            ? { strokeDasharray: '7 5' }
-            : edge.kind === 'membership'
-              ? { strokeDasharray: '2 5' }
-              : {})
+          stroke: stroke.color,
+          strokeWidth: stroke.strokeWidth,
+          ...(stroke.strokeDasharray === undefined ? {} : { strokeDasharray: stroke.strokeDasharray })
         },
         ariaLabel: `${edge.kind} from ${nodeLabel(snapshot, edge.source)} to ${nodeLabel(snapshot, edge.target)}`
       };
@@ -800,12 +792,6 @@ function replacePositions(
   for (const [id, position] of source) {
     target.set(id, position);
   }
-}
-
-function sourceHasRelationship(snapshot: GraphSnapshotDto, edge: GraphEdgeDto): boolean {
-  const source = snapshot.nodes.find(node => node.id === edge.source);
-  return source?.kind === 'function'
-    && source.source?.relationships.some(relationship => relationship.edgeId === edge.id) === true;
 }
 
 function nodeLabel(snapshot: GraphSnapshotDto, nodeId: string): string {

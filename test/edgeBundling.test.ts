@@ -31,6 +31,16 @@ describe('fan-out edge bundling', () => {
     expect(bundles.has('hidden-call')).toBe(false);
     expect(bundles.has('exact-call')).toBe(false);
   });
+
+  it('keeps selected and hover-preview calls on separate lanes', () => {
+    const bundles = bundleFanOutEdges([
+      edge('selected-call', 0, 0),
+      edge('preview-call', 0, 183, { reveal: 'preview' })
+    ]);
+
+    expect(bundles.get('selected-call')?.laneX).toBe(600);
+    expect(bundles.get('preview-call')?.laneX).toBe(610);
+  });
 });
 
 function edge(
@@ -40,6 +50,7 @@ function edge(
   overrides: Partial<{
     visible: boolean;
     kind: 'call' | 'reference';
+    reveal: 'selected' | 'preview';
     sourceHandleId: string;
   }> = {}
 ) {
@@ -48,6 +59,7 @@ function edge(
     sourceNodeId: 'origin',
     sourceHandleId: 'source',
     kind: 'call' as const,
+    reveal: 'selected' as const,
     visible: true,
     sourceX: 500,
     sourceY,

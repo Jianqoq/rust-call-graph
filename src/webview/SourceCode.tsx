@@ -1,4 +1,3 @@
-import { Handle, Position, useUpdateNodeInternals } from '@xyflow/react';
 import { Fragment, useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import {
   definitionModifierHint,
@@ -36,19 +35,6 @@ interface SourceLine {
   readonly segments: readonly SourceSegment[];
 }
 
-export function clampedSourceHandleRightInset(
-  defaultInset: number,
-  handleCenterX: number,
-  sourceViewportRight: number,
-  renderedScale: number
-): number {
-  if (renderedScale <= 0) {
-    return defaultInset;
-  }
-  const overflow = handleCenterX - sourceViewportRight;
-  return overflow <= 0 ? defaultInset : defaultInset + overflow / renderedScale;
-}
-
 export function SourceCode({
   nodeId,
   source,
@@ -56,10 +42,6 @@ export function SourceCode({
   definitionClickModifier = 'ctrlCmd',
   actions
 }: SourceCodeProps) {
-  const updateNodeInternals = useUpdateNodeInternals();
-  const updateFrame = useRef<number | undefined>(undefined);
-  const updateInternalsAfterFrame = useRef(false);
-  const sourceShell = useRef<HTMLDivElement>(null);
   const hoverRequestTimer = useRef<number | undefined>(undefined);
   const hoverCloseTimer = useRef<number | undefined>(undefined);
   const [hoverAnchor, setHoverAnchor] = useState<SourceHoverAnchor>();
@@ -127,53 +109,13 @@ export function SourceCode({
     actions.openDefinition(nodeId, sourceOffset);
   }, [actions, dismissLanguageHover, nodeId]);
 
-  const refreshHandles = useCallback((includeNodeInternals = true) => {
-    updateInternalsAfterFrame.current ||= includeNodeInternals;
-    if (updateFrame.current !== undefined) {
-      return;
-    }
-    updateFrame.current = window.requestAnimationFrame(() => {
-      updateFrame.current = undefined;
-      if (sourceShell.current !== null) {
-        clampRelationshipHandles(sourceShell.current);
-      }
-      if (updateInternalsAfterFrame.current) {
-        updateInternalsAfterFrame.current = false;
-        updateNodeInternals(nodeId);
-      }
-    });
-  }, [nodeId, updateNodeInternals]);
-
-  useEffect(() => {
-    refreshHandles();
-    return () => {
-      if (updateFrame.current !== undefined) {
-        window.cancelAnimationFrame(updateFrame.current);
-      }
-      cancelHoverTimers();
-    };
-  }, [cancelHoverTimers, refreshHandles, source]);
-
-  useEffect(() => {
-    if (sourceShell.current === null || typeof ResizeObserver === 'undefined') {
-      return;
-    }
-    const observer = new ResizeObserver(() => refreshHandles(false));
-    observer.observe(sourceShell.current);
-    const code = sourceShell.current.querySelector('.source-code');
-    if (code !== null) {
-      observer.observe(code);
-    }
-    return () => observer.disconnect();
-  }, [refreshHandles]);
+  useEffect(() => cancelHoverTimers, [cancelHoverTimers]);
 
   return (
     <div
-      ref={sourceShell}
       className="source-shell nodrag nowheel"
       aria-label={`Source for function, starting at line ${source.startLine + 1}`}
       onScroll={() => {
-        refreshHandles();
         dismissLanguageHover();
       }}
       onKeyDownCapture={event => {
@@ -298,29 +240,6 @@ function useDefinitionModifier(modifier: DefinitionClickModifier): boolean {
   return held;
 }
 
-function clampRelationshipHandles(sourceShell: HTMLDivElement): void {
-  const handles = [...sourceShell.querySelectorAll<HTMLElement>('.source-edge-handle')];
-  for (const handle of handles) {
-    handle.style.removeProperty('--source-edge-handle-right');
-  }
-
-  const shellRect = sourceShell.getBoundingClientRect();
-  const renderedScale = sourceShell.offsetWidth === 0 ? 1 : shellRect.width / sourceShell.offsetWidth;
-  const viewportRight = shellRect.left + sourceShell.clientWidth * renderedScale;
-  for (const handle of handles) {
-    const handleRect = handle.getBoundingClientRect();
-    const rightInset = clampedSourceHandleRightInset(
-      -5,
-      handleRect.left + handleRect.width / 2,
-      viewportRight,
-      renderedScale
-    );
-    if (rightInset !== -5) {
-      handle.style.setProperty('--source-edge-handle-right', `${rightInset}px`);
-    }
-  }
-}
-
 function RelationshipToken({
   nodeId,
   relationship,
@@ -383,13 +302,6 @@ function RelationshipToken({
       onKeyDown={onKeyDown}
     >
       {children}
-      <Handle
-        type="source"
-        id={`source-${relationship.edgeId}`}
-        position={Position.Right}
-        isConnectable={false}
-        className="source-edge-handle"
-      />
     </button>
   );
 }
