@@ -1,5 +1,10 @@
 import { Handle, Position, useUpdateNodeInternals } from '@xyflow/react';
 import { Fragment, useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import {
+  definitionModifierHint,
+  isDefinitionModifierClick,
+  type DefinitionClickModifier
+} from '../shared/definitionNavigation.js';
 import type {
   FunctionSourceDto,
   SourceRelationshipDto,
@@ -14,6 +19,7 @@ interface SourceCodeProps {
   readonly nodeId: string;
   readonly source: FunctionSourceDto;
   readonly sourceHover?: SourceHoverData;
+  readonly definitionClickModifier?: DefinitionClickModifier;
   readonly actions: NodeActions;
 }
 
@@ -43,7 +49,13 @@ export function clampedSourceHandleRightInset(
   return overflow <= 0 ? defaultInset : defaultInset + overflow / renderedScale;
 }
 
-export function SourceCode({ nodeId, source, sourceHover, actions }: SourceCodeProps) {
+export function SourceCode({
+  nodeId,
+  source,
+  sourceHover,
+  definitionClickModifier = 'ctrlCmd',
+  actions
+}: SourceCodeProps) {
   const updateNodeInternals = useUpdateNodeInternals();
   const updateFrame = useRef<number | undefined>(undefined);
   const updateInternalsAfterFrame = useRef(false);
@@ -51,6 +63,7 @@ export function SourceCode({ nodeId, source, sourceHover, actions }: SourceCodeP
   const hoverRequestTimer = useRef<number | undefined>(undefined);
   const hoverCloseTimer = useRef<number | undefined>(undefined);
   const [hoverAnchor, setHoverAnchor] = useState<SourceHoverAnchor>();
+  const modifierHeld = useDefinitionModifier(definitionClickModifier);
   const lines = buildSourceLines(source);
 
   const cancelHoverTimers = useCallback(() => {
@@ -108,6 +121,11 @@ export function SourceCode({ nodeId, source, sourceHover, actions }: SourceCodeP
       actions.requestSourceHover(nodeId, sourceOffset);
     }, 320);
   }, [actions, cancelHoverTimers, nodeId]);
+
+  const openDefinition = useCallback((sourceOffset: number) => {
+    dismissLanguageHover();
+    actions.openDefinition(nodeId, sourceOffset);
+  }, [actions, dismissLanguageHover, nodeId]);
 
   const refreshHandles = useCallback((includeNodeInternals = true) => {
     updateInternalsAfterFrame.current ||= includeNodeInternals;
@@ -167,9 +185,9 @@ export function SourceCode({ nodeId, source, sourceHover, actions }: SourceCodeP
       <div className="source-legend" aria-hidden="true">
         <span><i className="legend-call" /> call</span>
         <span><i className="legend-reference" /> reference</span>
-        <span className="source-hint">Double-click to follow</span>
+        <span className="source-hint">{definitionModifierHint(definitionClickModifier, navigator.platform)}. Double-click a call to follow</span>
       </div>
-      <pre className="source-code">
+      <pre className={`source-code${modifierHeld ? ' is-definition-modifier' : ''}`}>
         {lines.map(line => (
           <span className="source-line" key={line.number}>
             <span className="source-line-number" aria-hidden="true">{line.number}</span>
@@ -188,18 +206,21 @@ export function SourceCode({ nodeId, source, sourceHover, actions }: SourceCodeP
                   && sourceHover.blocks.length > 0
                   ? 'source-language-hover'
                   : undefined;
-                const token = segment.relationship === undefined
+                const relationship = segment.relationship;
+                const token = relationship === undefined
                   ? <Fragment key={index}>{content}</Fragment>
                   : (
                   <RelationshipToken
-                    key={`${segment.relationship.id}:${index}`}
+                    key={`${relationship.id}:${index}`}
                     nodeId={nodeId}
-                    relationship={segment.relationship}
+                    relationship={relationship}
                     actions={actions}
                     {...(segment.semanticToken === undefined
                       ? {}
                       : { tokenClassName: semanticTokenClassName(segment.semanticToken) })}
                     {...(hoverDescriptionId === undefined ? {} : { describedBy: hoverDescriptionId })}
+                    definitionClickModifier={definitionClickModifier}
+                    onOpenDefinition={() => openDefinition(relationship.startOffset)}
                   >
                     {content}
                   </RelationshipToken>
@@ -215,6 +236,14 @@ export function SourceCode({ nodeId, source, sourceHover, actions }: SourceCodeP
                     onMouseLeave={scheduleLanguageHoverClose}
                     onFocus={event => beginLanguageHover(segment.startOffset, event.currentTarget)}
                     onBlur={scheduleLanguageHoverClose}
+                    onClick={event => {
+                      if (!isDefinitionModifierClick(event, definitionClickModifier)) {
+                        return;
+                      }
+                      event.preventDefault();
+                      event.stopPropagation();
+                      openDefinition(segment.startOffset);
+                    }}
                   >
                     {token}
                   </span>
@@ -237,6 +266,29 @@ export function SourceCode({ nodeId, source, sourceHover, actions }: SourceCodeP
         )}
     </div>
   );
+}
+
+function useDefinitionModifier(modifier: DefinitionClickModifier): boolean {
+  const [held, setHeld] = useState(false);
+
+  useEffect(() => {
+    const sync = (event: { readonly altKey: boolean; readonly ctrlKey: boolean; readonly metaKey: boolean }): void => {
+      setHeld(isDefinitionModifierClick(event, modifier));
+    };
+    const reset = (): void => setHeld(false);
+    window.addEventListener('keydown', sync);
+    window.addEventListener('keyup', sync);
+    window.addEventListener('mousemove', sync);
+    window.addEventListener('blur', reset);
+    return () => {
+      window.removeEventListener('keydown', sync);
+      window.removeEventListener('keyup', sync);
+      window.removeEventListener('mousemove', sync);
+      window.removeEventListener('blur', reset);
+    };
+  }, [modifier]);
+
+  return held;
 }
 
 function clampRelationshipHandles(sourceShell: HTMLDivElement): void {
@@ -268,7 +320,9 @@ function RelationshipToken({
   children,
   actions,
   describedBy,
-  tokenClassName
+  tokenClassName,
+  definitionClickModifier,
+  onOpenDefinition
 }: {
   readonly nodeId: string;
   readonly relationship: SourceRelationshipDto;
@@ -276,6 +330,8 @@ function RelationshipToken({
   readonly actions: NodeActions;
   readonly describedBy?: string;
   readonly tokenClassName?: string;
+  readonly definitionClickModifier: DefinitionClickModifier;
+  readonly onOpenDefinition: () => void;
 }) {
   const graphRelationship = {
     edgeId: relationship.edgeId,
@@ -296,17 +352,25 @@ function RelationshipToken({
     <button
       type="button"
       className={`source-relationship source-relationship-${relationship.kind} nodrag${tokenClassName === undefined ? '' : ` ${tokenClassName}`}`}
-      title={`${relationship.kind === 'call' ? 'Calls' : 'References'} ${relationship.label}. Double-click to focus target.`}
+      title={`${relationship.kind === 'call' ? 'Calls' : 'References'} ${relationship.label}. ${definitionModifierHint(definitionClickModifier, navigator.platform)}. Double-click to focus target.`}
       aria-label={`${relationship.kind === 'call' ? 'Call' : 'Function reference'} to ${relationship.label}. Press Enter to focus; Space to pin relationship.`}
       aria-describedby={describedBy}
       onMouseEnter={() => actions.hoverRelationship(graphRelationship)}
       onMouseLeave={() => actions.hoverRelationship(undefined)}
       onClick={event => {
         event.stopPropagation();
+        if (isDefinitionModifierClick(event, definitionClickModifier)) {
+          event.preventDefault();
+          onOpenDefinition();
+          return;
+        }
         actions.pinRelationship(graphRelationship);
       }}
       onDoubleClick={event => {
         event.stopPropagation();
+        if (isDefinitionModifierClick(event, definitionClickModifier)) {
+          return;
+        }
         actions.followRelationship(nodeId, relationship.targetNodeId);
       }}
       onKeyDown={onKeyDown}

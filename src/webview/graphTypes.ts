@@ -1,4 +1,5 @@
 import type { Node } from '@xyflow/react';
+import type { DefinitionClickModifier } from '../shared/definitionNavigation.js';
 import type { FunctionExpansionState, GraphNodeDto, SourceHoverBlockDto } from '../shared/protocol.js';
 
 export interface HoveredRelationship {
@@ -33,6 +34,7 @@ export interface NodeActions {
   readonly pinRelationship: (relationship: HoveredRelationship) => void;
   readonly followRelationship: (originNodeId: string, targetNodeId: string) => void;
   readonly requestSourceHover: (nodeId: string, sourceOffset: number) => void;
+  readonly openDefinition: (nodeId: string, sourceOffset: number) => void;
   readonly clearSourceHover: () => void;
 }
 
@@ -44,6 +46,7 @@ export interface RustNodeData extends BaseNodeData {
   readonly outgoingActive: boolean;
   readonly proximityTarget: boolean;
   readonly sourceHover?: SourceHoverData;
+  readonly definitionClickModifier: DefinitionClickModifier;
   readonly actions: NodeActions;
 }
 

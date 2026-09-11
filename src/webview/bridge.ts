@@ -29,6 +29,7 @@ function createBrowserBridge(): VscodeApi {
     postMessage(message) {
       if (message.type === 'ready') {
         dispatchHostMessage({ type: 'syntaxPalette', palette: FALLBACK_SYNTAX_PALETTE });
+        dispatchHostMessage({ type: 'navigationSettings', definitionClickModifier: 'ctrlCmd' });
         dispatchHostMessage({ type: 'graphSnapshot', snapshot: currentSnapshot, reason: 'initial' });
       } else if (message.type === 'refresh') {
         dispatchHostMessage({ type: 'announce', tone: 'info', message: 'Demo graph refreshed.' });
@@ -63,6 +64,16 @@ function createBrowserBridge(): VscodeApi {
         }
       } else if (message.type === 'openSource') {
         dispatchHostMessage({ type: 'announce', tone: 'info', message: 'VS Code source navigation is available in the packaged extension.' });
+      } else if (message.type === 'openDefinition') {
+        const node = currentSnapshot.nodes.find(candidate => candidate.id === message.nodeId);
+        const token = node?.kind === 'function' && node.source !== undefined
+          ? identifierAt(node.source.text, message.sourceOffset)
+          : 'symbol';
+        dispatchHostMessage({
+          type: 'announce',
+          tone: 'info',
+          message: `Go to definition for ${token} is available in the packaged extension.`
+        });
       } else if (message.type === 'requestSourceHover') {
         const node = currentSnapshot.nodes.find(candidate => candidate.id === message.nodeId);
         const token = node?.kind === 'function' && node.source !== undefined

@@ -137,6 +137,7 @@ function FunctionBody({ node, data }: { readonly node: FunctionNodeDto; readonly
           nodeId={node.id}
           source={node.source}
           {...(data.sourceHover === undefined ? {} : { sourceHover: data.sourceHover })}
+          definitionClickModifier={data.definitionClickModifier}
           actions={data.actions}
         />
       )}

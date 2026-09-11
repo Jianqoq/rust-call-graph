@@ -31,6 +31,9 @@
   --graph-syntax-attribute: var(--vscode-editor-foreground, #d8dee9);
   --graph-syntax-lifetime: var(--vscode-editor-foreground, #d8dee9);
   --graph-syntax-operator: var(--vscode-editor-foreground, #d8dee9);
+  --graph-syntax-macro: var(--graph-syntax-function);
+  --graph-syntax-namespace: var(--vscode-editor-foreground, #d8dee9);
+  --graph-syntax-enum-member: var(--graph-syntax-type);
   --graph-syntax-bracket1: #ffd700;
   --graph-syntax-bracket2: #da70d6;
   --graph-syntax-bracket3: #179fff;
@@ -664,10 +667,12 @@ button:focus-visible,
   color: var(--graph-syntax-keyword);
 }
 
-.source-semantic.source-semantic-function,
-.source-semantic.source-semantic-macro,
-.source-semantic.source-semantic-method {
+.source-semantic.source-semantic-function {
   color: var(--graph-syntax-function);
+}
+
+.source-semantic.source-semantic-macro {
+  color: var(--graph-syntax-macro);
 }
 
 .source-semantic.source-semantic-struct,
@@ -676,10 +681,13 @@ button:focus-visible,
 .source-semantic.source-semantic-interface,
 .source-semantic.source-semantic-type,
 .source-semantic.source-semantic-type-parameter,
-.source-semantic.source-semantic-builtin-type,
+.source-semantic.source-semantic-builtin-type {
+  color: var(--graph-syntax-type);
+}
+
 .source-semantic.source-semantic-namespace,
 .source-semantic.source-semantic-module {
-  color: var(--graph-syntax-type);
+  color: var(--graph-syntax-namespace);
 }
 
 .source-semantic.source-semantic-lifetime {
@@ -687,7 +695,7 @@ button:focus-visible,
 }
 
 .source-semantic.source-semantic-enum-member {
-  color: var(--graph-syntax-number);
+  color: var(--graph-syntax-enum-member);
 }
 
 .source-semantic.source-semantic-parameter {
@@ -818,6 +826,13 @@ button:focus-visible,
 .source-hover-anchor {
   position: relative;
   border-radius: 2px;
+}
+
+.source-code.is-definition-modifier .source-hover-anchor {
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
 }
 
 .source-hover-anchor.is-language-hovered {

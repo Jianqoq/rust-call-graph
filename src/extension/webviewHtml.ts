@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import type { SyntaxPaletteDto } from '../shared/protocol.js';
-import { isSafeCssColor, SYNTAX_PALETTE_KEYS } from '../shared/syntaxPalette.js';
+import { isSafeCssColor, SYNTAX_PALETTE_KEYS, syntaxCssVariable } from '../shared/syntaxPalette.js';
 
 export function webviewHtml(
   webview: vscode.Webview,
@@ -12,7 +12,7 @@ export function webviewHtml(
   const nonce = createNonce();
   const syntaxVars = SYNTAX_PALETTE_KEYS
     .filter(key => isSafeCssColor(palette[key]))
-    .map(key => `--graph-syntax-${key}: ${palette[key]};`)
+    .map(key => `${syntaxCssVariable(key)}: ${palette[key]};`)
     .join(' ');
 
   return `<!doctype html>

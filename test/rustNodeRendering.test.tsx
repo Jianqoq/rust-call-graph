@@ -16,6 +16,7 @@ const actions: NodeActions = {
   pinRelationship: vi.fn(),
   followRelationship: vi.fn(),
   requestSourceHover: vi.fn(),
+  openDefinition: vi.fn(),
   clearSourceHover: vi.fn()
 };
 
@@ -45,6 +46,7 @@ describe('Function Node rendering', () => {
       incomingActive: false,
       outgoingActive: false,
       proximityTarget: false,
+      definitionClickModifier: 'ctrlCmd',
       actions
     };
 
@@ -95,6 +97,7 @@ describe('Function Node rendering', () => {
       incomingActive: false,
       outgoingActive: false,
       proximityTarget: false,
+      definitionClickModifier: 'ctrlCmd',
       actions
     });
 

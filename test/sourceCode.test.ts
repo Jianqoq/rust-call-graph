@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FunctionSourceDto } from '../src/shared/protocol.js';
 import { buildSourceLines, clampedSourceHandleRightInset } from '../src/webview/SourceCode.js';
+import { semanticTokenClassName } from '../src/webview/sourceHighlight.js';
 
 describe('source relationship handle geometry', () => {
   it('moves an overflowing long-name handle back to the source viewport boundary', () => {
@@ -300,5 +301,150 @@ describe('buildSourceLines', () => {
       'bracket1',
       'bracket2'
     ]);
+  });
+
+  it('colors module paths as namespaces and macro bangs as macros', () => {
+    const text = 'fn load() { ok!(fs::read_to_string("input")?); }';
+    const source: FunctionSourceDto = {
+      text,
+      startLine: 0,
+      startCharacter: 0,
+      relationships: [],
+      semanticTokens: []
+    };
+
+    const renderedTokens = buildSourceLines(source).flatMap(line => line.segments.flatMap(segment => {
+      const semanticToken = (segment as { semanticToken?: { tokenType: string } }).semanticToken;
+      return semanticToken === undefined ? [] : [{ text: segment.text, tokenType: semanticToken.tokenType }];
+    }));
+
+    expect(renderedTokens).toEqual(expect.arrayContaining([
+      { text: 'ok', tokenType: 'macro' },
+      { text: '!', tokenType: 'macroBang' },
+      { text: 'fs', tokenType: 'namespace' }
+    ]));
+    expect(renderedTokens).not.toEqual(expect.arrayContaining([
+      { text: '!', tokenType: 'operator' }
+    ]));
+  });
+
+  it('keeps PascalCase path segments as types and replaces rust-analyzer operator bangs on macros', () => {
+    const text = 'fn load() -> io::Result<()> { ok!(fs::read_to_string("input")); }';
+    const bang = text.indexOf('ok!') + 2;
+    const result = text.indexOf('Result');
+    const source: FunctionSourceDto = {
+      text,
+      startLine: 0,
+      startCharacter: 0,
+      relationships: [],
+      semanticTokens: [
+        { startOffset: bang, endOffset: bang + 1, tokenType: 'operator', modifiers: [] },
+        { startOffset: result, endOffset: result + 'Result'.length, tokenType: 'type', modifiers: [] }
+      ]
+    };
+
+    const renderedTokens = buildSourceLines(source).flatMap(line => line.segments.flatMap(segment => {
+      const semanticToken = (segment as { semanticToken?: { tokenType: string } }).semanticToken;
+      return semanticToken === undefined ? [] : [{ text: segment.text, tokenType: semanticToken.tokenType }];
+    }));
+
+    expect(renderedTokens).toEqual(expect.arrayContaining([
+      { text: 'io', tokenType: 'namespace' },
+      { text: 'Result', tokenType: 'type' },
+      { text: 'fs', tokenType: 'namespace' },
+      { text: '!', tokenType: 'macroBang' }
+    ]));
+    expect(renderedTokens).not.toEqual(expect.arrayContaining([
+      { text: '!', tokenType: 'operator' },
+      { text: 'Result', tokenType: 'namespace' }
+    ]));
+  });
+
+  it('keeps lexical macro color when rust-analyzer only marks the name unresolved', () => {
+    const text = 'fn load() { ok!(fs::read_to_string("input")); }';
+    const name = text.indexOf('ok');
+    const source: FunctionSourceDto = {
+      text,
+      startLine: 0,
+      startCharacter: 0,
+      relationships: [],
+      semanticTokens: [{
+        startOffset: name,
+        endOffset: name + 2,
+        tokenType: 'unresolvedReference',
+        modifiers: []
+      }]
+    };
+
+    const renderedTokens = buildSourceLines(source).flatMap(line => line.segments.flatMap(segment => {
+      const semanticToken = (segment as { semanticToken?: { tokenType: string } }).semanticToken;
+      return semanticToken === undefined ? [] : [{ text: segment.text, tokenType: semanticToken.tokenType }];
+    }));
+
+    expect(renderedTokens).toEqual(expect.arrayContaining([
+      { text: 'ok', tokenType: 'macro' },
+      { text: '!', tokenType: 'macroBang' }
+    ]));
+    expect(renderedTokens).not.toEqual(expect.arrayContaining([
+      { text: 'ok', tokenType: 'unresolvedReference' }
+    ]));
+  });
+
+  it('colors Ok and None as result/option variants instead of Rust struct types', () => {
+    const text = 'fn load() -> Result<(), io::Error> { Ok(None) }';
+    const source: FunctionSourceDto = {
+      text,
+      startLine: 0,
+      startCharacter: 0,
+      relationships: [],
+      semanticTokens: [
+        { startOffset: text.indexOf('Ok'), endOffset: text.indexOf('Ok') + 2, tokenType: 'enumMember', modifiers: [] },
+        { startOffset: text.indexOf('None'), endOffset: text.indexOf('None') + 4, tokenType: 'enumMember', modifiers: [] },
+        { startOffset: text.indexOf('Result'), endOffset: text.indexOf('Result') + 6, tokenType: 'enum', modifiers: [] }
+      ]
+    };
+
+    const renderedTokens = buildSourceLines(source).flatMap(line => line.segments.flatMap(segment => {
+      const semanticToken = (segment as { semanticToken?: { tokenType: string } }).semanticToken;
+      return semanticToken === undefined ? [] : [{ text: segment.text, tokenType: semanticToken.tokenType }];
+    }));
+
+    expect(renderedTokens).toEqual(expect.arrayContaining([
+      { text: 'Ok', tokenType: 'enumMember' },
+      { text: 'None', tokenType: 'enumMember' },
+      { text: 'Result', tokenType: 'enum' }
+    ]));
+  });
+});
+
+describe('semantic token class names', () => {
+  it('paints rust-analyzer method tokens with the editor function color', () => {
+    expect(semanticTokenClassName({
+      startOffset: 0,
+      endOffset: 5,
+      tokenType: 'method',
+      modifiers: []
+    })).toBe('source-semantic source-semantic-function');
+  });
+
+  it('paints macro bangs with the macro color and namespaces with the namespace color', () => {
+    expect(semanticTokenClassName({
+      startOffset: 0,
+      endOffset: 1,
+      tokenType: 'macroBang',
+      modifiers: []
+    })).toBe('source-semantic source-semantic-macro');
+    expect(semanticTokenClassName({
+      startOffset: 0,
+      endOffset: 2,
+      tokenType: 'module',
+      modifiers: []
+    })).toBe('source-semantic source-semantic-namespace');
+    expect(semanticTokenClassName({
+      startOffset: 0,
+      endOffset: 2,
+      tokenType: 'enumMember',
+      modifiers: []
+    })).toBe('source-semantic source-semantic-enum-member');
   });
 });

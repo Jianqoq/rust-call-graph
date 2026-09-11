@@ -113,6 +113,9 @@ export interface SyntaxPaletteDto {
   readonly attribute: string;
   readonly lifetime: string;
   readonly operator: string;
+  readonly macro: string;
+  readonly namespace: string;
+  readonly enumMember: string;
   readonly bracket1: string;
   readonly bracket2: string;
   readonly bracket3: string;
@@ -126,6 +129,7 @@ export type HostToWebviewMessage =
   | { readonly type: 'syntaxPalette'; readonly palette: SyntaxPaletteDto }
   | { readonly type: 'operation'; readonly state: 'loading' | 'idle'; readonly label: string }
   | { readonly type: 'sourceHover'; readonly requestId: number; readonly nodeId: string; readonly sourceOffset: number; readonly blocks: readonly SourceHoverBlockDto[] }
+  | { readonly type: 'navigationSettings'; readonly definitionClickModifier: 'ctrlCmd' | 'alt' }
   | { readonly type: 'announce'; readonly tone: 'info' | 'warning' | 'error'; readonly message: string };
 
 export type WebviewToHostMessage =
@@ -134,6 +138,7 @@ export type WebviewToHostMessage =
   | { readonly type: 'expandType'; readonly nodeId: string; readonly loadMore: boolean }
   | { readonly type: 'toggleSource'; readonly nodeId: string }
   | { readonly type: 'openSource'; readonly nodeId: string }
+  | { readonly type: 'openDefinition'; readonly nodeId: string; readonly sourceOffset: number }
   | { readonly type: 'requestSourceHover'; readonly requestId: number; readonly nodeId: string; readonly sourceOffset: number }
   | { readonly type: 'refresh' }
   | { readonly type: 'setIncludeDependencies'; readonly value: boolean };
@@ -149,6 +154,7 @@ export function isWebviewToHostMessage(value: unknown): value is WebviewToHostMe
     || type === 'expandType'
     || type === 'toggleSource'
     || type === 'openSource'
+    || type === 'openDefinition'
     || type === 'requestSourceHover'
     || type === 'refresh'
     || type === 'setIncludeDependencies';

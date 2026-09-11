@@ -26,12 +26,17 @@ describe('active VS Code theme syntax palette', () => {
         { scopes: ['entity.name.lifetime.rust'], foreground: '#D19A66' }
       ],
       semantic: {},
-      colors: {}
+      colors: {
+        'editor.foreground': '#ABB2BF'
+      }
     });
 
     expect(palette.keyword).toBe('#C678DD');
     expect(palette.function).toBe('#61AFEF');
+    expect(palette.macro).toBe('#61AFEF');
     expect(palette.type).toBe('#56B6C2');
+    expect(palette.enumMember).toBe('#E5C07B');
+    expect(palette.namespace).toBe('#ABB2BF');
     expect(palette.variable).toBe('#E06C75');
     expect(palette.parameter).toBe('#E06C75');
     expect(palette.string).toBe('#98C379');

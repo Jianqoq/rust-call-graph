@@ -31,6 +31,9 @@ export const FALLBACK_SYNTAX_PALETTE: SyntaxPaletteDto = {
   attribute: '#DCDCAA',
   lifetime: '#4EC9B0',
   operator: '#D4D4D4',
+  macro: '#DCDCAA',
+  namespace: '#D4D4D4',
+  enumMember: '#E5C07B',
   ...DARK_BRACKET_PALETTE
 };
 
@@ -45,7 +48,10 @@ export const SYNTAX_TOKEN_KEYS = [
   'comment',
   'attribute',
   'lifetime',
-  'operator'
+  'operator',
+  'macro',
+  'namespace',
+  'enumMember'
 ] as const;
 
 export const SYNTAX_BRACKET_KEYS = [
@@ -64,6 +70,10 @@ export const SYNTAX_PALETTE_KEYS = [
 
 export type SyntaxTokenKey = typeof SYNTAX_TOKEN_KEYS[number];
 export type SyntaxBracketKey = typeof SYNTAX_BRACKET_KEYS[number];
+
+export function syntaxCssVariable(key: keyof SyntaxPaletteDto): string {
+  return `--graph-syntax-${key.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()}`;
+}
 
 export function isSafeCssColor(value: string): boolean {
   return /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value)

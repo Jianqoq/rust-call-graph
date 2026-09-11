@@ -29,12 +29,15 @@ const PALETTE_SCOPES: Readonly<Record<SyntaxTokenKey, readonly string[]>> = {
   comment: ['comment.line.double-slash.rust', 'comment'],
   attribute: ['meta.attribute.rust', 'entity.other.attribute-name'],
   lifetime: ['entity.name.lifetime.rust', 'storage.modifier.lifetime.rust'],
-  operator: ['keyword.operator.rust', 'keyword.operator']
+  operator: ['keyword.operator.rust', 'keyword.operator'],
+  macro: ['entity.name.function.macro.rust', 'entity.name.function.macro', 'entity.name.function'],
+  namespace: ['entity.name.namespace.rust', 'entity.name.module.rust', 'entity.name.namespace'],
+  enumMember: ['entity.name.type.result.rust', 'entity.name.type.option.rust', 'entity.name.type']
 };
 
 const SEMANTIC_TYPES: Readonly<Record<SyntaxTokenKey, readonly string[]>> = {
   keyword: ['keyword'],
-  function: ['function', 'method', 'macro'],
+  function: ['function', 'method'],
   type: ['type', 'struct', 'class', 'enum', 'interface', 'builtinType'],
   variable: ['variable', 'property'],
   parameter: ['parameter', 'variable'],
@@ -43,7 +46,10 @@ const SEMANTIC_TYPES: Readonly<Record<SyntaxTokenKey, readonly string[]>> = {
   comment: ['comment'],
   attribute: ['decorator'],
   lifetime: ['lifetime'],
-  operator: ['operator']
+  operator: ['operator'],
+  macro: ['macro'],
+  namespace: ['namespace', 'module'],
+  enumMember: ['enumMember']
 };
 
 export function parseJsonc(text: string): unknown {
@@ -119,7 +125,11 @@ export function paletteFromResolvedTheme(theme: ResolvedThemeTokens): SyntaxPale
     const scoped = PALETTE_SCOPES[key]
       .map(scope => matchScopeColor(theme.rules, scope))
       .find((color): color is string => color !== undefined);
-    next[key] = semantic ?? scoped ?? next[key];
+    const unstyled = theme.colors['editor.foreground'];
+    const fallback = key === 'namespace' && unstyled !== undefined && isVisibleHighlightColor(unstyled)
+      ? unstyled
+      : next[key];
+    next[key] = semantic ?? scoped ?? fallback;
   }
   for (const [index, key] of SYNTAX_BRACKET_KEYS.entries()) {
     const color = theme.colors[`editorBracketHighlight.foreground${index + 1}`];

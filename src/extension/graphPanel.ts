@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { definitionClickModifierFromMultiCursor } from '../shared/definitionNavigation.js';
 import type { HostToWebviewMessage, SourceHoverBlockDto, WebviewToHostMessage } from '../shared/protocol.js';
 import { isWebviewToHostMessage } from '../shared/protocol.js';
 import { readGraphConfiguration } from './config.js';
@@ -33,6 +34,9 @@ export class GraphPanel implements vscode.Disposable {
       vscode.workspace.onDidChangeConfiguration(event => {
         if (event.affectsConfiguration('rustCallGraph')) {
           void this.refresh('settings');
+        }
+        if (event.affectsConfiguration('editor.multiCursorModifier')) {
+          void this.postNavigationSettings();
         }
         if (
           event.affectsConfiguration('workbench.colorTheme')
@@ -99,6 +103,7 @@ export class GraphPanel implements vscode.Disposable {
       switch (message.type) {
         case 'ready':
           await this.postSyntaxPalette();
+          await this.postNavigationSettings();
           await this.postSnapshot('initial');
           break;
         case 'expandFunction':
@@ -121,6 +126,9 @@ export class GraphPanel implements vscode.Disposable {
           break;
         case 'openSource':
           await this.openSource(message.nodeId);
+          break;
+        case 'openDefinition':
+          await this.openDefinition(message.nodeId, message.sourceOffset);
           break;
         case 'requestSourceHover':
           await this.provideSourceHover(message.requestId, message.nodeId, message.sourceOffset);
@@ -206,11 +214,42 @@ export class GraphPanel implements vscode.Disposable {
       await this.post({ type: 'announce', tone: 'warning', message: 'Source is unavailable for this node.' });
       return;
     }
-    const document = await vscode.workspace.openTextDocument(location.uri);
+    await this.revealLocation(location.uri, location.range);
+  }
+
+  private async openDefinition(nodeId: string, sourceOffset: number): Promise<void> {
+    const source = await this.session.sourcePosition(nodeId, sourceOffset);
+    if (source === undefined) {
+      await this.post({ type: 'announce', tone: 'warning', message: 'Source is unavailable for this token.' });
+      return;
+    }
+    const definitions = await this.language.definitions(source.uri, source.position);
+    if (definitions.length === 0) {
+      await this.post({ type: 'announce', tone: 'warning', message: 'No definition found for this symbol.' });
+      return;
+    }
+    const first = definitions[0];
+    if (definitions.length === 1 && first !== undefined) {
+      await this.revealLocation(first.uri, first.range);
+      return;
+    }
+    await this.revealLocation(source.uri, new vscode.Range(source.position, source.position));
+    await vscode.commands.executeCommand(
+      'editor.action.goToLocations',
+      source.uri,
+      source.position,
+      definitions.map(item => new vscode.Location(item.uri, item.range)),
+      'peek',
+      'No definition found.'
+    );
+  }
+
+  private async revealLocation(uri: vscode.Uri, range: vscode.Range): Promise<void> {
+    const document = await vscode.workspace.openTextDocument(uri);
     await vscode.window.showTextDocument(document, {
       preview: false,
       preserveFocus: false,
-      selection: location.range,
+      selection: range,
       viewColumn: vscode.ViewColumn.One
     });
   }
@@ -229,6 +268,15 @@ export class GraphPanel implements vscode.Disposable {
 
   private async postSyntaxPalette(): Promise<void> {
     await this.post({ type: 'syntaxPalette', palette: readActiveSyntaxPalette() });
+  }
+
+  private async postNavigationSettings(): Promise<void> {
+    await this.post({
+      type: 'navigationSettings',
+      definitionClickModifier: definitionClickModifierFromMultiCursor(
+        vscode.workspace.getConfiguration('editor').get<string>('multiCursorModifier')
+      )
+    });
   }
 
   private async post(message: HostToWebviewMessage): Promise<void> {

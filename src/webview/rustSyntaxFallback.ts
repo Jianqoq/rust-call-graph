@@ -23,6 +23,11 @@ const PUNCTUATION_TOKEN_TYPES = new Set([
   'parenthesis', 'brace', 'bracket', 'angle'
 ]);
 
+/** rust-analyzer paints these without a foreground, so VS Code keeps TextMate colors. */
+const TEXTMATE_PASSTHROUGH_TYPES = new Set(['unresolvedReference', 'enumMember']);
+const MACRO_TOKEN_TYPES = new Set(['macro', 'procMacro', 'macroBang']);
+const RESULT_OPTION_VARIANTS = new Set(['Ok', 'Err', 'Some', 'None']);
+
 const OPERATOR_LEXEMES = [
   '<<=', '>>=', '||=', '&&=', '..=',
   '==', '!=', '<=', '>=', '&&', '||',
@@ -35,12 +40,13 @@ export function withRustSyntaxFallbacks(
   text: string,
   semanticTokens: readonly SourceSemanticTokenDto[]
 ): readonly SourceSemanticTokenDto[] {
+  const opaque = semanticTokens.filter(item => !TEXTMATE_PASSTHROUGH_TYPES.has(item.tokenType));
   const fallbacks = rustSyntaxFallbackTokens(text).filter(candidate =>
-    !semanticTokens.some(item => rangesOverlap(candidate, item))
+    !opaque.some(item => semanticBlocksFallback(item, candidate))
   );
   return overlayOperatorTokens(
     text,
-    overlayBracketPairTokens(text, [...semanticTokens, ...fallbacks])
+    overlayBracketPairTokens(text, [...opaque, ...fallbacks])
   );
 }
 
@@ -143,6 +149,12 @@ export function rustSyntaxFallbackTokens(text: string): readonly SourceSemanticT
           expectFunctionName = false;
           expectVariableName = false;
         }
+      } else if (isMacroInvocation(text, end)) {
+        tokens.push(token(index, end, 'macro'));
+        expectFunctionName = false;
+        expectVariableName = false;
+        index = end;
+        continue;
       } else if (expectFunctionName) {
         tokens.push(token(index, end, 'function'));
         expectFunctionName = false;
@@ -151,6 +163,10 @@ export function rustSyntaxFallbackTokens(text: string): readonly SourceSemanticT
         tokens.push(token(index, end, 'variable'));
         expectFunctionName = false;
         expectVariableName = false;
+      } else if (text.startsWith('::', end) && !isTypeLikeIdentifier(identifier)) {
+        tokens.push(token(index, end, 'namespace'));
+      } else if (RESULT_OPTION_VARIANTS.has(identifier)) {
+        tokens.push(token(index, end, 'enumMember'));
       } else if (PRIMITIVE_TYPES.has(identifier) || isTypeLikeIdentifier(identifier)) {
         tokens.push(token(index, end, 'type'));
       }
@@ -253,7 +269,10 @@ function overlayOperatorTokens(
     return sortTokens(tokens);
   }
   const kept = tokens.filter(item => !operators.some(operator =>
-    rangesOverlap(item, operator) && PUNCTUATION_TOKEN_TYPES.has(item.tokenType)
+    rangesOverlap(item, operator) && (
+      PUNCTUATION_TOKEN_TYPES.has(item.tokenType)
+      || (operator.tokenType === 'macroBang' && item.tokenType === 'operator' && tokenSpanEquals(item, operator))
+    )
   ));
   const extra = operators.filter(operator =>
     !kept.some(item => tokenSpanEquals(item, operator))
@@ -271,6 +290,11 @@ function rustOperatorTokens(text: string): readonly SourceSemanticTokenDto[] {
     }
     const lexeme = OPERATOR_LEXEMES.find(candidate => text.startsWith(candidate, index));
     if (lexeme === undefined) {
+      index += 1;
+      continue;
+    }
+    if (lexeme === '!' && isMacroInvocation(text, index)) {
+      tokens.push(token(index, index + 1, 'macroBang'));
       index += 1;
       continue;
     }
@@ -317,6 +341,29 @@ function skippedOffsets(text: string): Set<number> {
     }
   }
   return skipped;
+}
+
+function semanticBlocksFallback(
+  semantic: SourceSemanticTokenDto,
+  fallback: SourceSemanticTokenDto
+): boolean {
+  if (!rangesOverlap(semantic, fallback)) {
+    return false;
+  }
+  if (fallback.tokenType === 'macro' && !MACRO_TOKEN_TYPES.has(semantic.tokenType)) {
+    return false;
+  }
+  return true;
+}
+
+function isMacroInvocation(text: string, bangOffset: number): boolean {
+  if (text[bangOffset] !== '!') {
+    return false;
+  }
+  if (text[bangOffset + 1] === '=') {
+    return false;
+  }
+  return /[\p{ID_Continue}_]/u.test(text[bangOffset - 1] ?? '');
 }
 
 function isTypeLikeIdentifier(identifier: string): boolean {

@@ -36,6 +36,7 @@ import {
   type MouseEvent as ReactMouseEvent
 } from 'react';
 import type { GraphEdgeDto, GraphSnapshotDto, HostToWebviewMessage } from '../shared/protocol.js';
+import type { DefinitionClickModifier } from '../shared/definitionNavigation.js';
 import { bridge } from './bridge.js';
 import { applySyntaxPalette } from './syntaxPalette.js';
 import { BundledEdge } from './BundledEdge.js';
@@ -102,6 +103,7 @@ function GraphSurface() {
   const [announcement, setAnnouncement] = useState('Waiting for graph data.');
   const [announcementTone, setAnnouncementTone] = useState<'info' | 'warning' | 'error'>('info');
   const [sourceHover, setSourceHover] = useState<SourceHoverData>();
+  const [definitionClickModifier, setDefinitionClickModifier] = useState<DefinitionClickModifier>('ctrlCmd');
   const sourceHoverRequestId = useRef(0);
   const initialViewApplied = useRef(false);
   const baselinePositions = useRef(new Map<string, Point>());
@@ -240,6 +242,7 @@ function GraphSurface() {
     pinRelationship,
     followRelationship: (originNodeId, targetNodeId) => focusGraphNode(targetNodeId, originNodeId),
     requestSourceHover,
+    openDefinition: (nodeId, sourceOffset) => bridge.postMessage({ type: 'openDefinition', nodeId, sourceOffset }),
     clearSourceHover
   }), [clearSourceHover, focusGraphNode, goBack, hoverRelationship, pinRelationship, requestSourceHover, toggleFunctionDirection]);
 
@@ -275,6 +278,8 @@ function GraphSurface() {
             blocks: message.blocks
           });
         }
+      } else if (message.type === 'navigationSettings') {
+        setDefinitionClickModifier(message.definitionClickModifier);
       } else if (message.type === 'announce') {
         setAnnouncement(message.message);
         setAnnouncementTone(message.tone);
@@ -377,12 +382,13 @@ function GraphSurface() {
           incomingActive: dto.kind === 'function' && directionIsActive(dto, 'incoming', collapsedDirections),
           outgoingActive: dto.kind === 'function' && directionIsActive(dto, 'outgoing', collapsedDirections),
           proximityTarget: inspectionTargetIds.has(node.id),
+          definitionClickModifier,
           ...(sourceHover?.nodeId === node.id ? { sourceHover } : {}),
           actions
         }
       };
     });
-  }, [actions, baseNodes, collapsedDirections, focusNodeId, graphView, hoveredRelationship, navigation.length, pinnedRelationship, recentRelationships, snapshot?.rootId, sourceHover]);
+  }, [actions, baseNodes, collapsedDirections, definitionClickModifier, focusNodeId, graphView, hoveredRelationship, navigation.length, pinnedRelationship, recentRelationships, snapshot?.rootId, sourceHover]);
 
   const edges = useMemo<Edge[]>(() => {
     if (snapshot === undefined || graphView === undefined) {

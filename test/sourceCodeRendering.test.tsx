@@ -26,6 +26,7 @@ const actions: NodeActions = {
   pinRelationship: vi.fn(),
   followRelationship: vi.fn(),
   requestSourceHover: vi.fn(),
+  openDefinition: vi.fn(),
   clearSourceHover: vi.fn()
 };
 
@@ -121,6 +122,48 @@ describe('SourceCode relationship rendering', () => {
       originNodeId: 'fn:load',
       targetNodeId: 'fn:validate_order'
     });
+  });
+
+  it('opens rust-analyzer definitions with Ctrl+click on variables and call names', () => {
+    const text = 'fn load(source: &str) { source.lines(); }';
+    const variableStart = text.indexOf('source.lines');
+    const callStart = text.indexOf('lines');
+    render(
+      <ReactFlowProvider>
+        <SourceCode
+          nodeId="fn:load"
+          source={{
+            text,
+            startLine: 0,
+            startCharacter: 0,
+            semanticTokens: [
+              { startOffset: variableStart, endOffset: variableStart + 6, tokenType: 'variable', modifiers: [] },
+              { startOffset: callStart, endOffset: callStart + 5, tokenType: 'function', modifiers: [] }
+            ],
+            relationships: [{
+              id: 'source:lines',
+              edgeId: 'edge:lines',
+              kind: 'call',
+              startOffset: callStart,
+              endOffset: callStart + 5,
+              targetNodeId: 'fn:lines',
+              label: 'lines'
+            }]
+          }}
+          actions={actions}
+        />
+      </ReactFlowProvider>
+    );
+
+    fireEvent.click(screen.getByText((_content, element) =>
+      element?.classList.contains('source-hover-anchor') === true
+      && element.textContent === 'source'
+    ), { ctrlKey: true });
+    fireEvent.click(screen.getByRole('button', { name: /Call to lines/ }), { ctrlKey: true });
+
+    expect(actions.openDefinition).toHaveBeenCalledWith('fn:load', variableStart);
+    expect(actions.openDefinition).toHaveBeenCalledWith('fn:load', callStart);
+    expect(actions.pinRelationship).not.toHaveBeenCalled();
   });
 
   it('renders safe VS Code-style code and documentation blocks for the active token', () => {

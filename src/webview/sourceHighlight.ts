@@ -11,11 +11,26 @@ export function isRustHoverLanguage(language: string | undefined): boolean {
 }
 
 export function semanticTokenClassName(token: SourceSemanticTokenDto): string {
-  const tokenType = token.tokenType.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+  const tokenType = displayTokenType(token.tokenType).replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
   const modifiers = token.modifiers.map(modifier =>
     `source-semantic-${modifier.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()}`
   );
   return ['source-semantic', `source-semantic-${tokenType}`, ...modifiers].join(' ');
+}
+
+const DISPLAY_TOKEN_TYPES: Readonly<Record<string, string>> = {
+  method: 'function',
+  macroBang: 'macro',
+  procMacro: 'macro',
+  module: 'namespace',
+  typeAlias: 'type',
+  union: 'type',
+  selfTypeKeyword: 'keyword',
+  static: 'variable'
+};
+
+function displayTokenType(tokenType: string): string {
+  return DISPLAY_TOKEN_TYPES[tokenType] ?? tokenType;
 }
 
 export function highlightRustSegments(text: string): readonly HighlightedRustSegment[] {
