@@ -37,6 +37,7 @@ import {
 } from 'react';
 import type { GraphEdgeDto, GraphSnapshotDto, HostToWebviewMessage } from '../shared/protocol.js';
 import { bridge } from './bridge.js';
+import { applySyntaxPalette } from './syntaxPalette.js';
 import { BundledEdge } from './BundledEdge.js';
 import { bundleFanOutEdges, type FanOutEdgeCandidate } from './edgeBundling.js';
 import { edgeIsVisible, edgeSourceHandleId, nodeHoverEdgeTarget } from './edgeVisibility.js';
@@ -245,7 +246,9 @@ function GraphSurface() {
   useEffect(() => {
     const onMessage = (event: MessageEvent<HostToWebviewMessage>): void => {
       const message = event.data;
-      if (message.type === 'graphSnapshot') {
+      if (message.type === 'syntaxPalette') {
+        applySyntaxPalette(message.palette);
+      } else if (message.type === 'graphSnapshot') {
         expandedSourceIds.current = new Set(message.snapshot.nodes
           .filter(node => node.kind === 'function' && node.source !== undefined)
           .map(node => node.id));

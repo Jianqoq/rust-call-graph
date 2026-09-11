@@ -1,4 +1,5 @@
 import type { GraphSnapshotDto, HostToWebviewMessage, WebviewToHostMessage } from '../shared/protocol.js';
+import { FALLBACK_SYNTAX_PALETTE } from '../shared/syntaxPalette.js';
 import { demoSnapshot } from './demoGraph.js';
 
 interface WebviewState {
@@ -27,6 +28,7 @@ function createBrowserBridge(): VscodeApi {
   return {
     postMessage(message) {
       if (message.type === 'ready') {
+        dispatchHostMessage({ type: 'syntaxPalette', palette: FALLBACK_SYNTAX_PALETTE });
         dispatchHostMessage({ type: 'graphSnapshot', snapshot: currentSnapshot, reason: 'initial' });
       } else if (message.type === 'refresh') {
         dispatchHostMessage({ type: 'announce', tone: 'info', message: 'Demo graph refreshed.' });

@@ -101,8 +101,22 @@ export interface GraphSnapshotDto {
   readonly limits: GraphLimitsDto;
 }
 
+export interface SyntaxPaletteDto {
+  readonly keyword: string;
+  readonly function: string;
+  readonly type: string;
+  readonly variable: string;
+  readonly parameter: string;
+  readonly string: string;
+  readonly number: string;
+  readonly comment: string;
+  readonly attribute: string;
+  readonly lifetime: string;
+}
+
 export type HostToWebviewMessage =
   | { readonly type: 'graphSnapshot'; readonly snapshot: GraphSnapshotDto; readonly reason: 'initial' | 'expand' | 'source' | 'refresh' | 'settings' }
+  | { readonly type: 'syntaxPalette'; readonly palette: SyntaxPaletteDto }
   | { readonly type: 'operation'; readonly state: 'loading' | 'idle'; readonly label: string }
   | { readonly type: 'sourceHover'; readonly requestId: number; readonly nodeId: string; readonly sourceOffset: number; readonly blocks: readonly SourceHoverBlockDto[] }
   | { readonly type: 'announce'; readonly tone: 'info' | 'warning' | 'error'; readonly message: string };

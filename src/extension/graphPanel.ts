@@ -4,6 +4,7 @@ import { isWebviewToHostMessage } from '../shared/protocol.js';
 import { readGraphConfiguration } from './config.js';
 import { GraphSession } from './graphSession.js';
 import type { RustLanguageService } from './languageService.js';
+import { readActiveSyntaxPalette } from './syntaxTheme.js';
 import { webviewHtml } from './webviewHtml.js';
 
 export class GraphPanel implements vscode.Disposable {
@@ -21,14 +22,24 @@ export class GraphPanel implements vscode.Disposable {
       enableScripts: true,
       localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'dist', 'webview')]
     };
-    panel.webview.html = webviewHtml(panel.webview, extensionUri);
+    panel.webview.html = webviewHtml(panel.webview, extensionUri, readActiveSyntaxPalette());
     this.disposables.push(
       panel.onDidDispose(() => this.dispose()),
       panel.webview.onDidReceiveMessage(value => this.onMessage(value)),
       vscode.workspace.onDidChangeTextDocument(event => this.onDocumentChanged(event)),
+      vscode.window.onDidChangeActiveColorTheme(() => {
+        void this.postSyntaxPalette();
+      }),
       vscode.workspace.onDidChangeConfiguration(event => {
         if (event.affectsConfiguration('rustCallGraph')) {
           void this.refresh('settings');
+        }
+        if (
+          event.affectsConfiguration('workbench.colorTheme')
+          || event.affectsConfiguration('editor.tokenColorCustomizations')
+          || event.affectsConfiguration('editor.semanticTokenColorCustomizations')
+        ) {
+          void this.postSyntaxPalette();
         }
       })
     );
@@ -87,6 +98,7 @@ export class GraphPanel implements vscode.Disposable {
     try {
       switch (message.type) {
         case 'ready':
+          await this.postSyntaxPalette();
           await this.postSnapshot('initial');
           break;
         case 'expandFunction':
@@ -213,6 +225,10 @@ export class GraphPanel implements vscode.Disposable {
 
   private async postSnapshot(reason: 'initial' | 'expand' | 'source' | 'refresh' | 'settings'): Promise<void> {
     await this.post({ type: 'graphSnapshot', snapshot: this.session.snapshot, reason });
+  }
+
+  private async postSyntaxPalette(): Promise<void> {
+    await this.post({ type: 'syntaxPalette', palette: readActiveSyntaxPalette() });
   }
 
   private async post(message: HostToWebviewMessage): Promise<void> {
