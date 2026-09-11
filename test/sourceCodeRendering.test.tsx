@@ -166,6 +166,72 @@ describe('SourceCode relationship rendering', () => {
     expect(actions.pinRelationship).not.toHaveBeenCalled();
   });
 
+  it('does not mark keywords, operators, or brackets as definition targets', () => {
+    const text = 'fn tally() { amount + 1 }';
+    const { container } = render(
+      <ReactFlowProvider>
+        <SourceCode
+          nodeId="fn:tally"
+          source={{
+            text,
+            startLine: 0,
+            startCharacter: 0,
+            semanticTokens: [],
+            relationships: []
+          }}
+          actions={actions}
+        />
+      </ReactFlowProvider>
+    );
+
+    const anchor = (value: string) =>
+      [...container.querySelectorAll('.source-hover-anchor')].find(node => node.textContent === value);
+
+    expect(anchor('fn')?.classList.contains('is-definition-target')).toBe(false);
+    expect(anchor('tally')?.classList.contains('is-definition-target')).toBe(true);
+    expect(anchor('+')?.classList.contains('is-definition-target')).toBe(false);
+    expect(anchor('(')?.classList.contains('is-definition-target')).toBe(false);
+  });
+
+  it('does not add a goto-definition underline on methods or Option variants', () => {
+    const text = 'fn tally() { Some(manifest.join(path)) }';
+    const joinStart = text.indexOf('join');
+    const someStart = text.indexOf('Some');
+    const { container } = render(
+      <ReactFlowProvider>
+        <SourceCode
+          nodeId="fn:tally"
+          source={{
+            text,
+            startLine: 0,
+            startCharacter: 0,
+            semanticTokens: [
+              { startOffset: someStart, endOffset: someStart + 4, tokenType: 'enumMember', modifiers: [] },
+              { startOffset: joinStart, endOffset: joinStart + 4, tokenType: 'method', modifiers: [] }
+            ],
+            relationships: [{
+              id: 'source:join',
+              edgeId: 'edge:join',
+              kind: 'call',
+              startOffset: joinStart,
+              endOffset: joinStart + 4,
+              targetNodeId: 'fn:join',
+              label: 'join'
+            }]
+          }}
+          actions={actions}
+        />
+      </ReactFlowProvider>
+    );
+
+    const anchor = (value: string) =>
+      [...container.querySelectorAll('.source-hover-anchor')].find(node => node.textContent === value);
+
+    expect(anchor('Some')?.classList.contains('is-definition-target')).toBe(false);
+    expect(anchor('join')?.classList.contains('is-definition-target')).toBe(false);
+    expect(anchor('join')?.querySelector('.source-relationship-call')).not.toBeNull();
+  });
+
   it('renders safe VS Code-style code and documentation blocks for the active token', () => {
     const text = 'fn load(value: Widget) {}';
     const tokenStart = text.indexOf('Widget');

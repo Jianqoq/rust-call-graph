@@ -54,4 +54,9 @@ describe('Source Expansion token palette', () => {
     expect(stylesheet).not.toMatch(/source-semantic-enum-member \{\s*color:\s*var\(--graph-syntax-type\)/);
     expect(stylesheet).not.toMatch(/source-semantic-enum-member \{\s*color:\s*var\(--graph-syntax-number\)/);
   });
+
+  it('underlines only the hovered definition target while the modifier is held', () => {
+    expect(stylesheet).toMatch(/\.is-definition-modifier \.source-hover-anchor\.is-definition-target:hover/);
+    expect(stylesheet).not.toMatch(/\.is-definition-modifier \.source-hover-anchor \{/);
+  });
 });

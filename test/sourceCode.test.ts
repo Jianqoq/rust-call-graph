@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { FunctionSourceDto } from '../src/shared/protocol.js';
 import { buildSourceLines, clampedSourceHandleRightInset } from '../src/webview/SourceCode.js';
-import { semanticTokenClassName } from '../src/webview/sourceHighlight.js';
+import { semanticTokenClassName, isDefinitionNavigableToken, showsGotoDefinitionUnderline } from '../src/webview/sourceHighlight.js';
 
 describe('source relationship handle geometry', () => {
   it('moves an overflowing long-name handle back to the source viewport boundary', () => {
@@ -415,6 +415,36 @@ describe('buildSourceLines', () => {
       { text: 'Result', tokenType: 'enum' }
     ]));
   });
+
+  it('keeps Some/Ok gold in let-bindings instead of painting them as variables', () => {
+    const text = 'fn load() { let Some(manifest) = manifest else { return Ok(None) }; }';
+    const source: FunctionSourceDto = {
+      text,
+      startLine: 0,
+      startCharacter: 0,
+      relationships: [],
+      semanticTokens: [{
+        startOffset: text.indexOf('Some'),
+        endOffset: text.indexOf('Some') + 4,
+        tokenType: 'variable',
+        modifiers: ['declaration']
+      }]
+    };
+
+    const renderedTokens = buildSourceLines(source).flatMap(line => line.segments.flatMap(segment => {
+      const semanticToken = (segment as { semanticToken?: { tokenType: string } }).semanticToken;
+      return semanticToken === undefined ? [] : [{ text: segment.text, tokenType: semanticToken.tokenType }];
+    }));
+
+    expect(renderedTokens).toEqual(expect.arrayContaining([
+      { text: 'Some', tokenType: 'enumMember' },
+      { text: 'Ok', tokenType: 'enumMember' },
+      { text: 'None', tokenType: 'enumMember' }
+    ]));
+    expect(renderedTokens).not.toEqual(expect.arrayContaining([
+      { text: 'Some', tokenType: 'variable' }
+    ]));
+  });
 });
 
 describe('semantic token class names', () => {
@@ -446,5 +476,21 @@ describe('semantic token class names', () => {
       tokenType: 'enumMember',
       modifiers: []
     })).toBe('source-semantic source-semantic-enum-member');
+  });
+
+  it('only treats definition-capable tokens as Ctrl+click targets', () => {
+    expect(isDefinitionNavigableToken('variable')).toBe(true);
+    expect(isDefinitionNavigableToken('function')).toBe(true);
+    expect(isDefinitionNavigableToken('macro')).toBe(true);
+    expect(isDefinitionNavigableToken('keyword')).toBe(false);
+    expect(isDefinitionNavigableToken('operator')).toBe(false);
+    expect(isDefinitionNavigableToken('bracket1')).toBe(false);
+    expect(isDefinitionNavigableToken('string')).toBe(false);
+    expect(isDefinitionNavigableToken('comment')).toBe(false);
+    expect(showsGotoDefinitionUnderline('method', 'file_digest', false)).toBe(false);
+    expect(showsGotoDefinitionUnderline('enumMember', 'Some', false)).toBe(false);
+    expect(showsGotoDefinitionUnderline('function', 'Some', false)).toBe(false);
+    expect(showsGotoDefinitionUnderline('function', 'load', true)).toBe(false);
+    expect(showsGotoDefinitionUnderline('variable', 'manifest', false)).toBe(true);
   });
 });

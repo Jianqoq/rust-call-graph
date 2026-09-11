@@ -13,7 +13,7 @@ import type {
 import type { NodeActions, SourceHoverData } from './graphTypes.js';
 import { SourceHoverCard, type SourceHoverAnchor } from './SourceHoverCard.js';
 import { coveringSemanticToken, withRustSyntaxFallbacks } from './rustSyntaxFallback.js';
-import { semanticTokenClassName } from './sourceHighlight.js';
+import { semanticTokenClassName, isDefinitionNavigableToken, showsGotoDefinitionUnderline } from './sourceHighlight.js';
 
 interface SourceCodeProps {
   readonly nodeId: string;
@@ -207,6 +207,13 @@ export function SourceCode({
                   ? 'source-language-hover'
                   : undefined;
                 const relationship = segment.relationship;
+                const canOpenDefinition = relationship !== undefined
+                  || (segment.semanticToken !== undefined && isDefinitionNavigableToken(segment.semanticToken.tokenType));
+                const showDefinitionCue = showsGotoDefinitionUnderline(
+                  segment.semanticToken?.tokenType,
+                  segment.text,
+                  relationship !== undefined
+                );
                 const token = relationship === undefined
                   ? <Fragment key={index}>{content}</Fragment>
                   : (
@@ -230,14 +237,14 @@ export function SourceCode({
                 }
                 return (
                   <span
-                    className={`source-hover-anchor${active ? ' is-language-hovered' : ''}`}
+                    className={`source-hover-anchor${active ? ' is-language-hovered' : ''}${showDefinitionCue ? ' is-definition-target' : ''}`}
                     key={`hover:${segment.startOffset}:${index}`}
                     onMouseEnter={event => beginLanguageHover(segment.startOffset, event.currentTarget)}
                     onMouseLeave={scheduleLanguageHoverClose}
                     onFocus={event => beginLanguageHover(segment.startOffset, event.currentTarget)}
                     onBlur={scheduleLanguageHoverClose}
                     onClick={event => {
-                      if (!isDefinitionModifierClick(event, definitionClickModifier)) {
+                      if (!canOpenDefinition || !isDefinitionModifierClick(event, definitionClickModifier)) {
                         return;
                       }
                       event.preventDefault();

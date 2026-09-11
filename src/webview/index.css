@@ -828,8 +828,11 @@ button:focus-visible,
   border-radius: 2px;
 }
 
-.source-code.is-definition-modifier .source-hover-anchor {
+.source-code.is-definition-modifier .source-hover-anchor.is-definition-target {
   cursor: pointer;
+}
+
+.source-code.is-definition-modifier .source-hover-anchor.is-definition-target:hover {
   text-decoration: underline;
   text-underline-offset: 3px;
   text-decoration-thickness: 1px;

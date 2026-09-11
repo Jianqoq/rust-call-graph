@@ -155,6 +155,12 @@ export function rustSyntaxFallbackTokens(text: string): readonly SourceSemanticT
         expectVariableName = false;
         index = end;
         continue;
+      } else if (RESULT_OPTION_VARIANTS.has(identifier)) {
+        tokens.push(token(index, end, 'enumMember'));
+        expectFunctionName = false;
+      } else if (PRIMITIVE_TYPES.has(identifier) || isTypeLikeIdentifier(identifier)) {
+        tokens.push(token(index, end, 'type'));
+        expectFunctionName = false;
       } else if (expectFunctionName) {
         tokens.push(token(index, end, 'function'));
         expectFunctionName = false;
@@ -165,10 +171,6 @@ export function rustSyntaxFallbackTokens(text: string): readonly SourceSemanticT
         expectVariableName = false;
       } else if (text.startsWith('::', end) && !isTypeLikeIdentifier(identifier)) {
         tokens.push(token(index, end, 'namespace'));
-      } else if (RESULT_OPTION_VARIANTS.has(identifier)) {
-        tokens.push(token(index, end, 'enumMember'));
-      } else if (PRIMITIVE_TYPES.has(identifier) || isTypeLikeIdentifier(identifier)) {
-        tokens.push(token(index, end, 'type'));
       }
       index = end;
       continue;
@@ -351,6 +353,9 @@ function semanticBlocksFallback(
     return false;
   }
   if (fallback.tokenType === 'macro' && !MACRO_TOKEN_TYPES.has(semantic.tokenType)) {
+    return false;
+  }
+  if (fallback.tokenType === 'enumMember' && semantic.tokenType !== 'enumMember') {
     return false;
   }
   return true;

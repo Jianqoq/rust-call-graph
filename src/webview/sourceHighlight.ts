@@ -10,6 +10,57 @@ export function isRustHoverLanguage(language: string | undefined): boolean {
   return language === undefined || language.length === 0 || language === 'rust' || language === 'rs';
 }
 
+const DEFINITION_TOKEN_TYPES = new Set([
+  'attribute',
+  'builtinType',
+  'constParameter',
+  'decorator',
+  'enum',
+  'enumMember',
+  'field',
+  'function',
+  'interface',
+  'lifetime',
+  'macro',
+  'macroBang',
+  'method',
+  'module',
+  'namespace',
+  'parameter',
+  'procMacro',
+  'property',
+  'selfKeyword',
+  'selfTypeKeyword',
+  'static',
+  'struct',
+  'type',
+  'typeAlias',
+  'typeParameter',
+  'union',
+  'unresolvedReference',
+  'variable'
+]);
+
+const RESULT_OPTION_VARIANTS = new Set(['Ok', 'Err', 'Some', 'None']);
+
+export function isDefinitionNavigableToken(tokenType: string): boolean {
+  return DEFINITION_TOKEN_TYPES.has(tokenType);
+}
+
+export function showsGotoDefinitionUnderline(
+  tokenType: string | undefined,
+  text: string,
+  hasRelationship: boolean
+): boolean {
+  if (hasRelationship || tokenType === undefined) {
+    return false;
+  }
+  if (tokenType === 'method' || tokenType === 'enumMember' || RESULT_OPTION_VARIANTS.has(text)) {
+    return false;
+  }
+  return isDefinitionNavigableToken(tokenType);
+}
+
 export function semanticTokenClassName(token: SourceSemanticTokenDto): string {
   const tokenType = displayTokenType(token.tokenType).replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
   const modifiers = token.modifiers.map(modifier =>
