@@ -179,4 +179,126 @@ describe('buildSourceLines', () => {
       { text: 'Result', tokenType: 'type' }
     ]));
   });
+
+  it('keeps rust-analyzer parameter tokens so they can share the editor variable color', () => {
+    const text = 'fn load(source: &str) { source.lines().map(|line| line); }';
+    const sourceStart = text.indexOf('source');
+    const lineStart = text.indexOf('|line|') + 1;
+    const source: FunctionSourceDto = {
+      text,
+      startLine: 0,
+      startCharacter: 0,
+      relationships: [],
+      semanticTokens: [
+        { startOffset: sourceStart, endOffset: sourceStart + 6, tokenType: 'parameter', modifiers: ['declaration'] },
+        { startOffset: lineStart, endOffset: lineStart + 4, tokenType: 'parameter', modifiers: [] }
+      ]
+    };
+
+    const renderedTokens = buildSourceLines(source).flatMap(line => line.segments.flatMap(segment => {
+      const semanticToken = (segment as { semanticToken?: { tokenType: string } }).semanticToken;
+      return semanticToken === undefined ? [] : [{ text: segment.text, tokenType: semanticToken.tokenType }];
+    }));
+
+    expect(renderedTokens).toEqual(expect.arrayContaining([
+      { text: 'source', tokenType: 'parameter' },
+      { text: 'line', tokenType: 'parameter' }
+    ]));
+  });
+
+  it('applies editor bracket-pair depths to matching parentheses', () => {
+    const source: FunctionSourceDto = {
+      text: 'fn load() { f(g()); }',
+      startLine: 0,
+      startCharacter: 0,
+      relationships: [],
+      semanticTokens: []
+    };
+
+    const renderedTokens = buildSourceLines(source).flatMap(line => line.segments.flatMap(segment => {
+      const semanticToken = (segment as { semanticToken?: { tokenType: string } }).semanticToken;
+      return semanticToken === undefined ? [] : [{ text: segment.text, tokenType: semanticToken.tokenType }];
+    }));
+
+    expect(renderedTokens.filter(item => item.text === '(').map(item => item.tokenType)).toEqual([
+      'bracket1',
+      'bracket2',
+      'bracket3'
+    ]);
+  });
+
+  it('does not color brackets inside strings', () => {
+    const text = 'fn load() { let message = "(ok)"; }';
+    const inner = text.indexOf('(ok)');
+    const source: FunctionSourceDto = {
+      text,
+      startLine: 0,
+      startCharacter: 0,
+      relationships: [],
+      semanticTokens: []
+    };
+    const covering = buildSourceLines(source).flatMap(line => line.segments.filter(segment =>
+      segment.startOffset <= inner && segment.endOffset > inner
+    ));
+    expect(covering.map(segment => (segment as { semanticToken?: { tokenType: string } }).semanticToken?.tokenType)).toEqual(['string']);
+  });
+
+  it('colors closure pipes and logical operators instead of leaving them as punctuation', () => {
+    const text = 'fn load(source: &str) { source.lines().map(|line| line.len() == 0 || false); }';
+    const pipe = text.indexOf('|line|');
+    const or = text.indexOf('||');
+    const source: FunctionSourceDto = {
+      text,
+      startLine: 0,
+      startCharacter: 0,
+      relationships: [],
+      semanticTokens: [
+        { startOffset: pipe, endOffset: pipe + 1, tokenType: 'punctuation', modifiers: [] },
+        { startOffset: pipe + 5, endOffset: pipe + 6, tokenType: 'punctuation', modifiers: [] }
+      ]
+    };
+
+    const renderedTokens = buildSourceLines(source).flatMap(line => line.segments.flatMap(segment => {
+      const semanticToken = (segment as { semanticToken?: { tokenType: string } }).semanticToken;
+      return semanticToken === undefined ? [] : [{ text: segment.text, tokenType: semanticToken.tokenType }];
+    }));
+
+    expect(renderedTokens).toEqual(expect.arrayContaining([
+      { text: '|', tokenType: 'operator' },
+      { text: '||', tokenType: 'operator' },
+      { text: '==', tokenType: 'operator' },
+      { text: '&', tokenType: 'operator' }
+    ]));
+    expect(text.slice(or, or + 2)).toBe('||');
+  });
+
+  it('keeps empty call parentheses as matching bracket depths even when rust-analyzer spans both', () => {
+    const text = 'fn load() { lines(); }';
+    const signature = text.indexOf('()');
+    const call = text.indexOf('lines()') + 'lines'.length;
+    const source: FunctionSourceDto = {
+      text,
+      startLine: 0,
+      startCharacter: 0,
+      relationships: [],
+      semanticTokens: [
+        { startOffset: signature, endOffset: signature + 2, tokenType: 'parenthesis', modifiers: [] },
+        { startOffset: call, endOffset: call + 2, tokenType: 'parenthesis', modifiers: [] }
+      ]
+    };
+
+    const renderedTokens = buildSourceLines(source).flatMap(line => line.segments.flatMap(segment => {
+      const semanticToken = (segment as { semanticToken?: { tokenType: string } }).semanticToken;
+      return semanticToken === undefined ? [] : [{ text: segment.text, tokenType: semanticToken.tokenType }];
+    }));
+
+    expect(renderedTokens.filter(item => item.text === '(').map(item => item.tokenType)).toEqual([
+      'bracket1',
+      'bracket2'
+    ]);
+    expect(renderedTokens.filter(item => item.text === ')').map(item => item.tokenType)).toEqual([
+      'bracket1',
+      'bracket2'
+    ]);
+  });
 });

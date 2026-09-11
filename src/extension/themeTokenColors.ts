@@ -1,5 +1,11 @@
 import type { SyntaxPaletteDto } from '../shared/protocol.js';
-import { FALLBACK_SYNTAX_PALETTE, SYNTAX_PALETTE_KEYS } from '../shared/syntaxPalette.js';
+import {
+  FALLBACK_SYNTAX_PALETTE,
+  isVisibleHighlightColor,
+  SYNTAX_BRACKET_KEYS,
+  SYNTAX_TOKEN_KEYS,
+  type SyntaxTokenKey
+} from '../shared/syntaxPalette.js';
 
 export interface TokenColorRule {
   readonly scopes: readonly string[];
@@ -9,32 +15,35 @@ export interface TokenColorRule {
 export interface ResolvedThemeTokens {
   readonly rules: readonly TokenColorRule[];
   readonly semantic: Readonly<Record<string, string>>;
+  readonly colors: Readonly<Record<string, string>>;
 }
 
-const PALETTE_SCOPES: Readonly<Record<keyof SyntaxPaletteDto, readonly string[]>> = {
+const PALETTE_SCOPES: Readonly<Record<SyntaxTokenKey, readonly string[]>> = {
   keyword: ['keyword.control.rust', 'keyword.control', 'storage', 'keyword'],
   function: ['entity.name.function.rust', 'entity.name.function', 'support.function.any-method'],
   type: ['entity.name.type.rust', 'storage.type.core.rust', 'entity.name.type', 'entity.name.class', 'support.type'],
   variable: ['variable.other.rust', 'meta.definition.variable', 'variable'],
-  parameter: ['variable.parameter.rust', 'variable.parameter'],
+  parameter: ['variable.other.rust', 'variable.other', 'variable', 'variable.parameter.rust', 'variable.parameter'],
   string: ['string.quoted.double.rust', 'string'],
   number: ['constant.numeric.rust', 'constant.numeric', 'constant'],
   comment: ['comment.line.double-slash.rust', 'comment'],
   attribute: ['meta.attribute.rust', 'entity.other.attribute-name'],
-  lifetime: ['entity.name.lifetime.rust', 'storage.modifier.lifetime.rust']
+  lifetime: ['entity.name.lifetime.rust', 'storage.modifier.lifetime.rust'],
+  operator: ['keyword.operator.rust', 'keyword.operator']
 };
 
-const SEMANTIC_TYPES: Readonly<Record<keyof SyntaxPaletteDto, readonly string[]>> = {
+const SEMANTIC_TYPES: Readonly<Record<SyntaxTokenKey, readonly string[]>> = {
   keyword: ['keyword'],
   function: ['function', 'method', 'macro'],
   type: ['type', 'struct', 'class', 'enum', 'interface', 'builtinType'],
   variable: ['variable', 'property'],
-  parameter: ['parameter'],
+  parameter: ['parameter', 'variable'],
   string: ['string'],
   number: ['number'],
   comment: ['comment'],
   attribute: ['decorator'],
-  lifetime: ['lifetime']
+  lifetime: ['lifetime'],
+  operator: ['operator']
 };
 
 export function parseJsonc(text: string): unknown {
@@ -58,12 +67,7 @@ export function collectTokenRules(tokenColors: unknown): TokenColorRule[] {
     if (foreground === undefined) {
       continue;
     }
-    const scope = (entry as { scope?: unknown }).scope;
-    const scopes = typeof scope === 'string'
-      ? [scope]
-      : Array.isArray(scope)
-        ? scope.filter((item): item is string => typeof item === 'string')
-        : [];
+    const scopes = normalizeScopes((entry as { scope?: unknown }).scope);
     if (scopes.length === 0) {
       continue;
     }
@@ -94,11 +98,10 @@ export function matchScopeColor(rules: readonly TokenColorRule[], targetScope: s
       continue;
     }
     for (const scope of rule.scopes) {
-      const selector = scope.trim().split(/\s+/u).at(-1);
-      if (selector === undefined || !scopeMatches(targetScope, selector)) {
+      if (/\s/u.test(scope) || !scopeMatches(targetScope, scope)) {
         continue;
       }
-      const score = selector.length;
+      const score = scope.length;
       if (best === undefined || score > best.score || (score === best.score && index >= best.index)) {
         best = { score, index, color: rule.foreground };
       }
@@ -109,7 +112,7 @@ export function matchScopeColor(rules: readonly TokenColorRule[], targetScope: s
 
 export function paletteFromResolvedTheme(theme: ResolvedThemeTokens): SyntaxPaletteDto {
   const next: Record<keyof SyntaxPaletteDto, string> = { ...FALLBACK_SYNTAX_PALETTE };
-  for (const key of SYNTAX_PALETTE_KEYS) {
+  for (const key of SYNTAX_TOKEN_KEYS) {
     const semantic = SEMANTIC_TYPES[key]
       .map(type => theme.semantic[type])
       .find((color): color is string => color !== undefined);
@@ -117,6 +120,12 @@ export function paletteFromResolvedTheme(theme: ResolvedThemeTokens): SyntaxPale
       .map(scope => matchScopeColor(theme.rules, scope))
       .find((color): color is string => color !== undefined);
     next[key] = semantic ?? scoped ?? next[key];
+  }
+  for (const [index, key] of SYNTAX_BRACKET_KEYS.entries()) {
+    const color = theme.colors[`editorBracketHighlight.foreground${index + 1}`];
+    if (color !== undefined && isVisibleHighlightColor(color)) {
+      next[key] = color;
+    }
   }
   return next;
 }
@@ -135,12 +144,13 @@ export function overlayEditorColorCustomizations(
   palette: SyntaxPaletteDto,
   themeName: string,
   tokenColorCustomizations: unknown,
-  semanticTokenColorCustomizations: unknown
+  semanticTokenColorCustomizations: unknown,
+  workbenchColorCustomizations?: unknown
 ): SyntaxPaletteDto {
   const next: Record<keyof SyntaxPaletteDto, string> = { ...palette };
   const tokenBlock = customizationSection(tokenColorCustomizations, themeName);
   const extraRules = collectTokenRules(tokenBlock.textMateRules);
-  for (const key of SYNTAX_PALETTE_KEYS) {
+  for (const key of SYNTAX_TOKEN_KEYS) {
     const scoped = PALETTE_SCOPES[key]
       .map(scope => matchScopeColor(extraRules, scope))
       .find((color): color is string => color !== undefined);
@@ -159,12 +169,20 @@ export function overlayEditorColorCustomizations(
   const semanticRules = collectSemanticForegrounds(
     semanticBlock.rules === undefined ? semanticBlock : semanticBlock.rules
   );
-  for (const key of SYNTAX_PALETTE_KEYS) {
+  for (const key of SYNTAX_TOKEN_KEYS) {
     const semantic = SEMANTIC_TYPES[key]
       .map(type => semanticRules[type])
       .find((color): color is string => color !== undefined);
     if (semantic !== undefined) {
       next[key] = semantic;
+    }
+  }
+
+  const workbenchColors = collectStringColors(customizationSection(workbenchColorCustomizations, themeName));
+  for (const [index, key] of SYNTAX_BRACKET_KEYS.entries()) {
+    const color = workbenchColors[`editorBracketHighlight.foreground${index + 1}`];
+    if (color !== undefined && isVisibleHighlightColor(color)) {
+      next[key] = color;
     }
   }
   return next;
@@ -200,40 +218,69 @@ export function resolveThemeTokens(
   depth = 0
 ): ResolvedThemeTokens {
   if (depth > 8) {
-    return { rules: [], semantic: {} };
+    return { rules: [], semantic: {}, colors: {} };
   }
   const document = parseThemeDocument(readFile(filePath));
   const included = document.include === undefined
-    ? { rules: [] as TokenColorRule[], semantic: {} as Record<string, string> }
+    ? { rules: [] as TokenColorRule[], semantic: {} as Record<string, string>, colors: {} as Record<string, string> }
     : resolveThemeTokens(join(dirname(filePath), document.include), readFile, dirname, join, depth + 1);
   return {
     rules: [...included.rules, ...collectTokenRules(document.tokenColors)],
     semantic: {
       ...included.semantic,
       ...collectSemanticForegrounds(document.semanticTokenColors)
+    },
+    colors: {
+      ...included.colors,
+      ...document.colors
     }
   };
+}
+
+function normalizeScopes(scope: unknown): string[] {
+  const entries = typeof scope === 'string'
+    ? [scope]
+    : Array.isArray(scope)
+      ? scope.filter((item): item is string => typeof item === 'string')
+      : [];
+  return entries.flatMap(entry => entry.split(',')).map(item => item.trim()).filter(item => item.length > 0);
 }
 
 function parseThemeDocument(text: string): {
   readonly include?: string;
   readonly tokenColors?: unknown;
   readonly semanticTokenColors?: unknown;
+  readonly colors: Readonly<Record<string, string>>;
 } {
   const value = parseJsonc(text);
   if (typeof value !== 'object' || value === null) {
-    return {};
+    return { colors: {} };
   }
   const record = value as {
     include?: unknown;
     tokenColors?: unknown;
     semanticTokenColors?: unknown;
+    colors?: unknown;
   };
   return {
     ...(typeof record.include === 'string' ? { include: record.include } : {}),
     ...(record.tokenColors === undefined ? {} : { tokenColors: record.tokenColors }),
-    ...(record.semanticTokenColors === undefined ? {} : { semanticTokenColors: record.semanticTokenColors })
+    ...(record.semanticTokenColors === undefined ? {} : { semanticTokenColors: record.semanticTokenColors }),
+    colors: collectStringColors(record.colors)
   };
+}
+
+function collectStringColors(value: unknown): Record<string, string> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return {};
+  }
+  const colors: Record<string, string> = {};
+  for (const [key, color] of Object.entries(value)) {
+    if (typeof color === 'string' && color.length > 0) {
+      colors[key] = color;
+    }
+  }
+  return colors;
 }
 
 function scopeMatches(target: string, selector: string): boolean {

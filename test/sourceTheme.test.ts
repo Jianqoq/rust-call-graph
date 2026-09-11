@@ -30,4 +30,10 @@ describe('Source Expansion token palette', () => {
     expect(rule).not.toMatch(/textPreformat-foreground/);
     expect(nested).toMatch(/color:\s*inherit/);
   });
+
+  it('colors matching brackets from the injected palette instead of possibly transparent webview variables', () => {
+    expect(stylesheet).toMatch(/--graph-syntax-bracket1:\s*#ffd700/);
+    expect(stylesheet).toMatch(/\.source-semantic-bracket2\s*\{[^}]*color:\s*var\(--graph-syntax-bracket2\)/);
+    expect(stylesheet).not.toMatch(/editorBracketHighlight-foreground/);
+  });
 });

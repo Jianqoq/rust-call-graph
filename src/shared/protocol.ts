@@ -112,6 +112,13 @@ export interface SyntaxPaletteDto {
   readonly comment: string;
   readonly attribute: string;
   readonly lifetime: string;
+  readonly operator: string;
+  readonly bracket1: string;
+  readonly bracket2: string;
+  readonly bracket3: string;
+  readonly bracket4: string;
+  readonly bracket5: string;
+  readonly bracket6: string;
 }
 
 export type HostToWebviewMessage =

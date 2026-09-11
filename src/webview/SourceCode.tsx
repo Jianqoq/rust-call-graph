@@ -7,7 +7,7 @@ import type {
 } from '../shared/protocol.js';
 import type { NodeActions, SourceHoverData } from './graphTypes.js';
 import { SourceHoverCard, type SourceHoverAnchor } from './SourceHoverCard.js';
-import { withRustSyntaxFallbacks } from './rustSyntaxFallback.js';
+import { coveringSemanticToken, withRustSyntaxFallbacks } from './rustSyntaxFallback.js';
 import { semanticTokenClassName } from './sourceHighlight.js';
 
 interface SourceCodeProps {
@@ -196,6 +196,9 @@ export function SourceCode({ nodeId, source, sourceHover, actions }: SourceCodeP
                     nodeId={nodeId}
                     relationship={segment.relationship}
                     actions={actions}
+                    {...(segment.semanticToken === undefined
+                      ? {}
+                      : { tokenClassName: semanticTokenClassName(segment.semanticToken) })}
                     {...(hoverDescriptionId === undefined ? {} : { describedBy: hoverDescriptionId })}
                   >
                     {content}
@@ -264,13 +267,15 @@ function RelationshipToken({
   relationship,
   children,
   actions,
-  describedBy
+  describedBy,
+  tokenClassName
 }: {
   readonly nodeId: string;
   readonly relationship: SourceRelationshipDto;
   readonly children: ReactNode;
   readonly actions: NodeActions;
   readonly describedBy?: string;
+  readonly tokenClassName?: string;
 }) {
   const graphRelationship = {
     edgeId: relationship.edgeId,
@@ -290,7 +295,7 @@ function RelationshipToken({
   return (
     <button
       type="button"
-      className={`source-relationship source-relationship-${relationship.kind} nodrag`}
+      className={`source-relationship source-relationship-${relationship.kind} nodrag${tokenClassName === undefined ? '' : ` ${tokenClassName}`}`}
       title={`${relationship.kind === 'call' ? 'Calls' : 'References'} ${relationship.label}. Double-click to focus target.`}
       aria-label={`${relationship.kind === 'call' ? 'Call' : 'Function reference'} to ${relationship.label}. Press Enter to focus; Space to pin relationship.`}
       aria-describedby={describedBy}
@@ -356,9 +361,7 @@ export function buildSourceLines(source: FunctionSourceDto): readonly SourceLine
       const relationship = relationships.find(item =>
         item.startOffset <= segmentStart && item.endOffset >= segmentEnd
       );
-      const semanticToken = semanticTokens.find(item =>
-        item.startOffset <= segmentStart && item.endOffset >= segmentEnd
-      );
+      const semanticToken = coveringSemanticToken(semanticTokens, segmentStart, segmentEnd);
       segments.push({
         text: source.text.slice(segmentStart, segmentEnd),
         startOffset: segmentStart,

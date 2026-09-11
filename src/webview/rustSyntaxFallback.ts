@@ -18,15 +18,53 @@ const PRIMITIVE_TYPES = new Set([
 const FN_PREFIX_KEYWORDS = new Set(['async', 'const', 'extern', 'pub', 'safe', 'unsafe']);
 const BINDING_KEYWORDS = new Set(['const', 'let', 'static']);
 
+const PUNCTUATION_TOKEN_TYPES = new Set([
+  'punctuation', 'colon', 'comma', 'semicolon', 'dot',
+  'parenthesis', 'brace', 'bracket', 'angle'
+]);
+
+const OPERATOR_LEXEMES = [
+  '<<=', '>>=', '||=', '&&=', '..=',
+  '==', '!=', '<=', '>=', '&&', '||',
+  '<<', '>>', '->', '=>', '::', '..',
+  '+=', '-=', '*=', '/=', '%=', '^=', '&=', '|=',
+  '|', '&', '^', '!', '?', '=', '+', '-', '*', '/', '%', '@'
+];
+
 export function withRustSyntaxFallbacks(
   text: string,
   semanticTokens: readonly SourceSemanticTokenDto[]
 ): readonly SourceSemanticTokenDto[] {
   const fallbacks = rustSyntaxFallbackTokens(text).filter(candidate =>
-    !semanticTokens.some(token => rangesOverlap(candidate, token))
+    !semanticTokens.some(item => rangesOverlap(candidate, item))
   );
-  return [...semanticTokens, ...fallbacks]
-    .sort((left, right) => left.startOffset - right.startOffset || left.endOffset - right.endOffset);
+  return overlayOperatorTokens(
+    text,
+    overlayBracketPairTokens(text, [...semanticTokens, ...fallbacks])
+  );
+}
+
+export function coveringSemanticToken(
+  tokens: readonly SourceSemanticTokenDto[],
+  startOffset: number,
+  endOffset: number
+): SourceSemanticTokenDto | undefined {
+  let best: { readonly token: SourceSemanticTokenDto; readonly index: number } | undefined;
+  for (const [index, token] of tokens.entries()) {
+    if (token.startOffset > startOffset || token.endOffset < endOffset) {
+      continue;
+    }
+    const length = token.endOffset - token.startOffset;
+    const bestLength = best === undefined ? undefined : best.token.endOffset - best.token.startOffset;
+    if (
+      best === undefined
+      || length < (bestLength ?? length)
+      || (length === bestLength && (token.startOffset > best.token.startOffset || (token.startOffset === best.token.startOffset && index >= best.index)))
+    ) {
+      best = { token, index };
+    }
+  }
+  return best?.token;
 }
 
 export function rustSyntaxFallbackTokens(text: string): readonly SourceSemanticTokenDto[] {
@@ -192,6 +230,95 @@ function scanStringOrCharacter(text: string, start: number): number | undefined 
   return quote === '"' ? text.length : undefined;
 }
 
+function overlayBracketPairTokens(
+  text: string,
+  tokens: readonly SourceSemanticTokenDto[]
+): readonly SourceSemanticTokenDto[] {
+  const brackets = rustBracketPairTokens(text);
+  if (brackets.length === 0) {
+    return sortTokens(tokens);
+  }
+  const kept = tokens.filter(item => !brackets.some(bracket =>
+    rangesOverlap(item, bracket) && (PUNCTUATION_TOKEN_TYPES.has(item.tokenType) || tokenSpanEquals(item, bracket))
+  ));
+  return sortTokens([...kept, ...brackets]);
+}
+
+function overlayOperatorTokens(
+  text: string,
+  tokens: readonly SourceSemanticTokenDto[]
+): readonly SourceSemanticTokenDto[] {
+  const operators = rustOperatorTokens(text);
+  if (operators.length === 0) {
+    return sortTokens(tokens);
+  }
+  const kept = tokens.filter(item => !operators.some(operator =>
+    rangesOverlap(item, operator) && PUNCTUATION_TOKEN_TYPES.has(item.tokenType)
+  ));
+  const extra = operators.filter(operator =>
+    !kept.some(item => tokenSpanEquals(item, operator))
+  );
+  return sortTokens([...kept, ...extra]);
+}
+
+function rustOperatorTokens(text: string): readonly SourceSemanticTokenDto[] {
+  const skipped = skippedOffsets(text);
+  const tokens: SourceSemanticTokenDto[] = [];
+  for (let index = 0; index < text.length; ) {
+    if (skipped.has(index)) {
+      index += 1;
+      continue;
+    }
+    const lexeme = OPERATOR_LEXEMES.find(candidate => text.startsWith(candidate, index));
+    if (lexeme === undefined) {
+      index += 1;
+      continue;
+    }
+    tokens.push(token(index, index + lexeme.length, 'operator'));
+    index += lexeme.length;
+  }
+  return tokens;
+}
+
+function rustBracketPairTokens(text: string): readonly SourceSemanticTokenDto[] {
+  const skipped = skippedOffsets(text);
+  const tokens: SourceSemanticTokenDto[] = [];
+  const stack: number[] = [];
+  const pairs: Readonly<Record<string, string>> = { ')': '(', ']': '[', '}': '{' };
+
+  for (let index = 0; index < text.length; index += 1) {
+    if (skipped.has(index)) {
+      continue;
+    }
+    const character = text[index] ?? '';
+    if (character === '(' || character === '[' || character === '{') {
+      const depth = (stack.length % 6) + 1;
+      stack.push(depth);
+      tokens.push(token(index, index + 1, `bracket${depth}`));
+      continue;
+    }
+    if (pairs[character] === undefined) {
+      continue;
+    }
+    const depth = stack.pop() ?? 1;
+    tokens.push(token(index, index + 1, `bracket${depth}`));
+  }
+  return tokens;
+}
+
+function skippedOffsets(text: string): Set<number> {
+  const skipped = new Set<number>();
+  for (const item of rustSyntaxFallbackTokens(text)) {
+    if (item.tokenType !== 'string' && item.tokenType !== 'comment') {
+      continue;
+    }
+    for (let index = item.startOffset; index < item.endOffset; index += 1) {
+      skipped.add(index);
+    }
+  }
+  return skipped;
+}
+
 function isTypeLikeIdentifier(identifier: string): boolean {
   const first = [...identifier][0];
   if (first === undefined || first.toUpperCase() !== first || first.toLowerCase() === first) {
@@ -202,6 +329,14 @@ function isTypeLikeIdentifier(identifier: string): boolean {
 
 function token(startOffset: number, endOffset: number, tokenType: string): SourceSemanticTokenDto {
   return { startOffset, endOffset, tokenType, modifiers: [] };
+}
+
+function sortTokens(tokens: readonly SourceSemanticTokenDto[]): SourceSemanticTokenDto[] {
+  return [...tokens].sort((left, right) => left.startOffset - right.startOffset || left.endOffset - right.endOffset);
+}
+
+function tokenSpanEquals(left: SourceSemanticTokenDto, right: SourceSemanticTokenDto): boolean {
+  return left.startOffset === right.startOffset && left.endOffset === right.endOffset;
 }
 
 function rangesOverlap(left: SourceSemanticTokenDto, right: SourceSemanticTokenDto): boolean {

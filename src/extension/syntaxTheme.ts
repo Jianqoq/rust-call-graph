@@ -2,7 +2,11 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import * as vscode from 'vscode';
 import type { SyntaxPaletteDto } from '../shared/protocol.js';
-import { FALLBACK_SYNTAX_PALETTE } from '../shared/syntaxPalette.js';
+import {
+  FALLBACK_SYNTAX_PALETTE,
+  LIGHT_BRACKET_PALETTE,
+  SYNTAX_BRACKET_KEYS
+} from '../shared/syntaxPalette.js';
 import {
   overlayEditorColorCustomizations,
   paletteFromResolvedTheme,
@@ -21,22 +25,40 @@ export function readActiveSyntaxPalette(): SyntaxPaletteDto {
       : resolveThemeTokens(themePath, readFileSyncPath, path.dirname, path.join);
     const theme: ResolvedThemeTokens = {
       rules: loaded.rules,
-      semantic: useSemantic ? loaded.semantic : {}
+      semantic: useSemantic ? loaded.semantic : {},
+      colors: {
+        ...lightBracketWorkbenchColors(),
+        ...loaded.colors
+      }
     };
     const palette = paletteFromResolvedTheme(theme);
     return overlayEditorColorCustomizations(
       palette,
       themeName,
       vscode.workspace.getConfiguration('editor').get('tokenColorCustomizations'),
-      vscode.workspace.getConfiguration('editor').get('semanticTokenColorCustomizations')
+      vscode.workspace.getConfiguration('editor').get('semanticTokenColorCustomizations'),
+      vscode.workspace.getConfiguration('workbench').get('colorCustomizations')
     );
   } catch {
     return FALLBACK_SYNTAX_PALETTE;
   }
 }
 
+function lightBracketWorkbenchColors(): Record<string, string> {
+  const kind = vscode.window.activeColorTheme.kind;
+  if (kind !== vscode.ColorThemeKind.Light && kind !== vscode.ColorThemeKind.HighContrastLight) {
+    return {};
+  }
+  return Object.fromEntries(
+    SYNTAX_BRACKET_KEYS.map((key, index) => [
+      `editorBracketHighlight.foreground${index + 1}`,
+      LIGHT_BRACKET_PALETTE[key]
+    ])
+  );
+}
+
 function emptyTheme(): ResolvedThemeTokens {
-  return { rules: [], semantic: {} };
+  return { rules: [], semantic: {}, colors: {} };
 }
 
 function readFileSyncPath(filePath: string): string {

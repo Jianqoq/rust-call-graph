@@ -30,6 +30,13 @@
   --graph-syntax-comment: var(--vscode-editor-foreground, #d8dee9);
   --graph-syntax-attribute: var(--vscode-editor-foreground, #d8dee9);
   --graph-syntax-lifetime: var(--vscode-editor-foreground, #d8dee9);
+  --graph-syntax-operator: var(--vscode-editor-foreground, #d8dee9);
+  --graph-syntax-bracket1: #ffd700;
+  --graph-syntax-bracket2: #da70d6;
+  --graph-syntax-bracket3: #179fff;
+  --graph-syntax-bracket4: #ffd700;
+  --graph-syntax-bracket5: #da70d6;
+  --graph-syntax-bracket6: #179fff;
   --graph-shadow: 0 18px 48px rgba(0, 0, 0, 0.24), 0 2px 8px rgba(0, 0, 0, 0.18);
   --graph-radius: 9px;
 }
@@ -652,74 +659,117 @@ button:focus-visible,
   white-space: pre;
 }
 
-.source-semantic-keyword,
-.source-semantic-modifier {
+.source-semantic.source-semantic-keyword,
+.source-semantic.source-semantic-modifier {
   color: var(--graph-syntax-keyword);
 }
 
-.source-semantic-function,
-.source-semantic-macro,
-.source-semantic-method {
+.source-semantic.source-semantic-function,
+.source-semantic.source-semantic-macro,
+.source-semantic.source-semantic-method {
   color: var(--graph-syntax-function);
 }
 
-.source-semantic-struct,
-.source-semantic-class,
-.source-semantic-enum,
-.source-semantic-interface,
-.source-semantic-type,
-.source-semantic-type-parameter,
-.source-semantic-builtin-type,
-.source-semantic-namespace,
-.source-semantic-module {
+.source-semantic.source-semantic-struct,
+.source-semantic.source-semantic-class,
+.source-semantic.source-semantic-enum,
+.source-semantic.source-semantic-interface,
+.source-semantic.source-semantic-type,
+.source-semantic.source-semantic-type-parameter,
+.source-semantic.source-semantic-builtin-type,
+.source-semantic.source-semantic-namespace,
+.source-semantic.source-semantic-module {
   color: var(--graph-syntax-type);
 }
 
-.source-semantic-lifetime {
+.source-semantic.source-semantic-lifetime {
   color: var(--graph-syntax-lifetime);
 }
 
-.source-semantic-enum-member {
+.source-semantic.source-semantic-enum-member {
   color: var(--graph-syntax-number);
 }
 
-.source-semantic-parameter {
+.source-semantic.source-semantic-parameter {
   color: var(--graph-syntax-parameter);
 }
 
-.source-semantic-variable,
-.source-semantic-property,
-.source-semantic-field {
+.source-semantic.source-semantic-variable,
+.source-semantic.source-semantic-property,
+.source-semantic.source-semantic-field {
   color: var(--graph-syntax-variable);
 }
 
-.source-semantic-self-keyword {
+.source-semantic.source-semantic-self-keyword {
   color: var(--graph-syntax-keyword);
 }
 
-.source-semantic-string,
-.source-semantic-regexp {
+.source-semantic.source-semantic-string,
+.source-semantic.source-semantic-regexp {
   color: var(--graph-syntax-string);
 }
 
-.source-semantic-number {
+.source-semantic.source-semantic-number {
   color: var(--graph-syntax-number);
 }
 
-.source-semantic-boolean {
+.source-semantic.source-semantic-boolean {
   color: var(--graph-syntax-keyword);
 }
 
-.source-semantic-operator {
-  color: var(--graph-text);
+.source-semantic.source-semantic-operator,
+.source-semantic.source-semantic-comparison,
+.source-semantic.source-semantic-logical,
+.source-semantic.source-semantic-arithmetic,
+.source-semantic.source-semantic-bitwise {
+  color: var(--graph-syntax-operator);
 }
 
-.source-semantic-comment {
+.source-semantic.source-semantic-punctuation,
+.source-semantic.source-semantic-colon,
+.source-semantic.source-semantic-comma,
+.source-semantic.source-semantic-semicolon,
+.source-semantic.source-semantic-dot {
+  color: var(--vscode-editor-foreground, var(--graph-text));
+}
+
+.source-semantic.source-semantic-bracket1 {
+  color: var(--graph-syntax-bracket1);
+}
+
+.source-semantic.source-semantic-bracket2 {
+  color: var(--graph-syntax-bracket2);
+}
+
+.source-semantic.source-semantic-bracket3 {
+  color: var(--graph-syntax-bracket3);
+}
+
+.source-semantic.source-semantic-bracket4 {
+  color: var(--graph-syntax-bracket4);
+}
+
+.source-semantic.source-semantic-bracket5 {
+  color: var(--graph-syntax-bracket5);
+}
+
+.source-semantic.source-semantic-bracket6 {
+  color: var(--graph-syntax-bracket6);
+}
+
+.source-semantic.source-semantic-parenthesis,
+.source-semantic.source-semantic-brace,
+.source-semantic.source-semantic-bracket,
+.source-semantic.source-semantic-angle {
+  color: var(--graph-syntax-bracket1);
+}
+
+.source-semantic.source-semantic-comment {
   color: var(--graph-syntax-comment);
 }
 
-.source-semantic-attribute,
-.source-semantic-decorator {
+.source-semantic.source-semantic-attribute,
+.source-semantic.source-semantic-decorator {
   color: var(--graph-syntax-attribute);
 }
 
@@ -740,29 +790,29 @@ button:focus-visible,
   color: inherit;
   background: transparent;
   border: 0;
-  border-bottom: 1px solid;
-  border-radius: 2px;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 42%, transparent);
+  border-radius: 0;
   cursor: pointer;
   font: inherit;
   line-height: inherit;
 }
 
 .source-relationship-call {
-  background: color-mix(in srgb, var(--graph-call) 16%, transparent);
-  border-color: var(--graph-call);
+  background: transparent;
+  border-bottom-color: color-mix(in srgb, currentColor 42%, transparent);
 }
 
 .source-relationship-reference {
-  background: color-mix(in srgb, var(--graph-reference) 15%, transparent);
-  border-color: var(--graph-reference);
+  background: transparent;
   border-bottom-style: dashed;
+  border-bottom-color: color-mix(in srgb, currentColor 42%, transparent);
 }
 
 .source-relationship:hover,
 .source-relationship:focus-visible {
-  color: var(--graph-text);
-  background: color-mix(in srgb, currentColor 22%, transparent);
-  box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 35%, transparent);
+  color: inherit;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  box-shadow: none;
 }
 
 .source-hover-anchor {

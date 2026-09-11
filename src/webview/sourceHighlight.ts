@@ -1,5 +1,5 @@
 import type { SourceSemanticTokenDto } from '../shared/protocol.js';
-import { withRustSyntaxFallbacks } from './rustSyntaxFallback.js';
+import { withRustSyntaxFallbacks, coveringSemanticToken } from './rustSyntaxFallback.js';
 
 export interface HighlightedRustSegment {
   readonly text: string;
@@ -33,7 +33,7 @@ export function highlightRustSegments(text: string): readonly HighlightedRustSeg
     if (end <= start) {
       continue;
     }
-    const token = tokens.find(item => item.startOffset <= start && item.endOffset >= end);
+    const token = coveringSemanticToken(tokens, start, end);
     segments.push({
       text: text.slice(start, end),
       ...(token === undefined ? {} : { token })
