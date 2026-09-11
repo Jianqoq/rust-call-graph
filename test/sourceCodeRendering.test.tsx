@@ -4,6 +4,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { NodeActions } from '../src/webview/graphTypes.js';
 import { SourceCode } from '../src/webview/SourceCode.js';
 
+const reactFlowMocks = vi.hoisted(() => ({
+  updateNodeInternals: vi.fn()
+}));
+
+vi.mock('@xyflow/react', async importOriginal => ({
+  ...await importOriginal<typeof import('@xyflow/react')>(),
+  useUpdateNodeInternals: () => reactFlowMocks.updateNodeInternals
+}));
+
+const defaultResizeObserver = globalThis.ResizeObserver;
+
 const actions: NodeActions = {
   toggleSource: vi.fn(),
   toggleFunctionDirection: vi.fn(),
@@ -21,6 +32,10 @@ const actions: NodeActions = {
 afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
+  Object.defineProperty(globalThis, 'ResizeObserver', {
+    value: defaultResizeObserver,
+    writable: true
+  });
   document.querySelector('.source-language-hover')?.remove();
 });
 
@@ -177,5 +192,52 @@ describe('SourceCode relationship rendering', () => {
     expect(tooltip.querySelector('.source-language-hover-label')).toBeNull();
     expect(tooltip.querySelector('.source-language-hover-language')).toBeNull();
     expect(tooltip.querySelectorAll('.source-language-hover-code')).toHaveLength(1);
+  });
+
+  it('does not recursively remeasure React Flow from its source ResizeObserver', () => {
+    vi.useFakeTimers();
+    let resizeCallback: ResizeObserverCallback | undefined;
+    let resizeObserver: ResizeObserver | undefined;
+    class CapturingResizeObserver implements ResizeObserver {
+      constructor(callback: ResizeObserverCallback) {
+        resizeCallback = callback;
+        resizeObserver = this;
+      }
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    }
+    Object.defineProperty(globalThis, 'ResizeObserver', {
+      value: CapturingResizeObserver,
+      writable: true
+    });
+
+    const { container } = render(
+      <ReactFlowProvider>
+        <SourceCode
+          nodeId="fn:inspect"
+          source={{
+            text: 'fn inspect() {}',
+            startLine: 0,
+            startCharacter: 0,
+            semanticTokens: [],
+            relationships: []
+          }}
+          actions={actions}
+        />
+      </ReactFlowProvider>
+    );
+    act(() => vi.advanceTimersByTime(20));
+    reactFlowMocks.updateNodeInternals.mockClear();
+
+    act(() => {
+      resizeCallback?.([], resizeObserver as ResizeObserver);
+      vi.advanceTimersByTime(20);
+    });
+    expect(reactFlowMocks.updateNodeInternals).not.toHaveBeenCalled();
+
+    fireEvent.scroll(container.querySelector('.source-shell') as HTMLElement);
+    act(() => vi.advanceTimersByTime(20));
+    expect(reactFlowMocks.updateNodeInternals).toHaveBeenCalledWith('fn:inspect');
   });
 });

@@ -1,5 +1,5 @@
 import * as ContextMenu from '@radix-ui/react-context-menu';
-import { Handle, Position } from '@xyflow/react';
+import { Handle, NodeResizer, Position, useUpdateNodeInternals } from '@xyflow/react';
 import {
   Braces,
   Check,
@@ -15,10 +15,17 @@ import {
 } from 'lucide-react';
 import type { FunctionNodeDto, FunctionExpansionState, TypeNodeDto } from '../shared/protocol.js';
 import type { RustNodeData } from './graphTypes.js';
+import {
+  EXPANDED_NODE_MAX_HEIGHT,
+  EXPANDED_NODE_MAX_WIDTH,
+  EXPANDED_NODE_MIN_HEIGHT,
+  EXPANDED_NODE_MIN_WIDTH
+} from './nodeSizing.js';
 import { SourceCode } from './SourceCode.js';
 
 export function RustNode({ data, selected }: { readonly data: RustNodeData; readonly selected?: boolean }) {
   const { dto, actions } = data;
+  const updateNodeInternals = useUpdateNodeInternals();
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>
@@ -27,6 +34,20 @@ export function RustNode({ data, selected }: { readonly data: RustNodeData; read
           aria-label={`${dto.kind === 'function' ? 'Function' : dto.typeKind} ${dto.label}`}
           tabIndex={0}
         >
+          {dto.kind === 'function' && dto.source !== undefined && (
+            <NodeResizer
+              nodeId={dto.id}
+              minWidth={EXPANDED_NODE_MIN_WIDTH}
+              minHeight={EXPANDED_NODE_MIN_HEIGHT}
+              maxWidth={EXPANDED_NODE_MAX_WIDTH}
+              maxHeight={EXPANDED_NODE_MAX_HEIGHT}
+              handleClassName="node-resize-handle"
+              lineClassName="node-resize-line"
+              onResizeEnd={() => {
+                window.requestAnimationFrame(() => updateNodeInternals(dto.id));
+              }}
+            />
+          )}
           <Handle type="target" id="target" position={Position.Left} isConnectable={false} className="node-handle node-handle-target" />
           <NodeHeader data={data} />
           {dto.kind === 'function'

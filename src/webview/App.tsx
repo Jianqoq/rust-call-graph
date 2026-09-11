@@ -45,6 +45,12 @@ import type { BaseFlowNode, HoveredRelationship, NodeActions, RustFlowNode, Sour
 import { activeInspectionRelationships, clearNodeSelection, nextPinnedRelationship, pinnedRelationshipAfterSourceToggle, promoteRecentRelationship } from './interactionState.js';
 import { finishGridDrag, layoutGraph, makeRoomForExpandedSources, previewGridDrag, reorderRecentTargetsInGrid, type Point, type Size } from './layout.js';
 import { NODE_INTERACTION } from './nodeInteraction.js';
+import {
+  EXPANDED_NODE_DEFAULT_WIDTH,
+  EXPANDED_NODE_MIN_HEIGHT,
+  EXPANDED_NODE_MIN_WIDTH
+} from './nodeSizing.js';
+import { centeredNodeViewport } from './nodeViewport.js';
 import { RustNode } from './RustNode.js';
 
 const nodeTypes: NodeTypes = {
@@ -57,7 +63,6 @@ const INITIAL_READABLE_ZOOM = 0.7;
 
 interface NavigationEntry {
   readonly nodeId: string;
-  readonly viewport: Viewport;
 }
 
 interface GridDragSession {
@@ -109,6 +114,28 @@ function GraphSurface() {
     [pinnedRelationship]
   );
 
+  const centerGraphNode = useCallback((nodeId: string) => {
+    window.requestAnimationFrame(() => {
+      const node = flow.getNode(nodeId);
+      if (node === undefined) {
+        return;
+      }
+      const expanded = node.data.dto.kind === 'function' && node.data.dto.source !== undefined;
+      const measured = measuredSizes.current.get(node.id);
+      const size = effectiveNodeSize(node, expanded, measured);
+      const visualViewport = window.visualViewport;
+      const viewport = centeredNodeViewport(
+        node.position,
+        size,
+        {
+          width: visualViewport?.width ?? window.innerWidth,
+          height: visualViewport?.height ?? window.innerHeight
+        }
+      );
+      void flow.setViewport(viewport, { duration: reducedMotion ? 0 : 220 });
+    });
+  }, [flow, reducedMotion]);
+
   const focusGraphNode = useCallback((nodeId: string, originNodeId?: string) => {
     setPinnedRelationship(undefined);
     const node = flow.getNode(nodeId);
@@ -119,13 +146,13 @@ function GraphSurface() {
     }
     const origin = originNodeId ?? focusNodeId;
     if (origin !== undefined && origin !== nodeId) {
-      setNavigation(history => [...history, { nodeId: origin, viewport: flow.getViewport() }]);
+      setNavigation(history => [...history, { nodeId: origin }]);
     }
     setFocusNodeId(nodeId);
     setAnnouncement(`Focused ${node.data.dto.label}.`);
     setAnnouncementTone('info');
-    void flow.fitView({ nodes: [node], padding: 0.65, duration: reducedMotion ? 0 : 220, maxZoom: 1.35 });
-  }, [flow, focusNodeId, reducedMotion]);
+    centerGraphNode(nodeId);
+  }, [centerGraphNode, flow, focusNodeId]);
 
   const goBack = useCallback(() => {
     const entry = navigation.at(-1);
@@ -134,10 +161,10 @@ function GraphSurface() {
     }
     setNavigation(history => history.slice(0, -1));
     setFocusNodeId(entry.nodeId);
-    void flow.setViewport(entry.viewport, { duration: reducedMotion ? 0 : 220 });
+    centerGraphNode(entry.nodeId);
     const node = flow.getNode(entry.nodeId);
     setAnnouncement(`Returned to ${node?.data.dto.label ?? 'the previous node'}.`);
-  }, [flow, navigation, reducedMotion]);
+  }, [centerGraphNode, flow, navigation]);
 
   const rememberRelationship = useCallback((relationship: HoveredRelationship) => {
     setRecentRelationships(history => promoteRecentRelationship(history, relationship));
@@ -316,6 +343,7 @@ function GraphSurface() {
       )
     }));
     const inspectionRelationships = activeInspectionRelationships(pinnedRelationship, hoveredRelationship);
+    const sizes = new Map(boxes.map(box => [box.id, box.size]));
     const gridPositions = reorderRecentTargetsInGrid(boxes, recentRelationships);
     const reorderedBoxes = boxes.map(box => ({
       ...box,
@@ -330,9 +358,14 @@ function GraphSurface() {
     return visibleBaseNodes.map(node => {
       const dto = node.data.dto;
       const position = positions.get(node.id) ?? node.position;
+      const expanded = dto.kind === 'function' && dto.source !== undefined;
+      const size = sizes.get(node.id);
       return {
         ...node,
         position,
+        ...(expanded && size !== undefined
+          ? { style: { ...node.style, width: size.width, height: size.height } }
+          : {}),
         data: {
           ...node.data,
           root: node.id === snapshot?.rootId,
@@ -731,7 +764,9 @@ function reconcileNodes(
 
 function effectiveNodeSize(node: BaseFlowNode, expanded: boolean, measured: Size | undefined): Size {
   if (expanded) {
-    if (measured !== undefined && measured.width >= 500) {
+    if (measured !== undefined
+      && measured.width >= EXPANDED_NODE_MIN_WIDTH
+      && measured.height >= EXPANDED_NODE_MIN_HEIGHT) {
       return measured;
     }
     const dto = node.data.dto;
@@ -740,9 +775,9 @@ function effectiveNodeSize(node: BaseFlowNode, expanded: boolean, measured: Size
       : 1;
     const baseHeight = 112;
     const sourceHeight = Math.min(440, 45 + lineCount * 22.5) + 10;
-    return { width: 660, height: baseHeight + sourceHeight };
+    return { width: EXPANDED_NODE_DEFAULT_WIDTH, height: baseHeight + sourceHeight };
   }
-  if (measured !== undefined && measured.width < 500) {
+  if (measured !== undefined && measured.width < EXPANDED_NODE_MIN_WIDTH) {
     return measured;
   }
   return { width: 338, height: node.data.dto.kind === 'type' ? 142 : 120 };

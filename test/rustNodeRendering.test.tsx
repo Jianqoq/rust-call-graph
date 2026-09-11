@@ -59,4 +59,58 @@ describe('Function Node rendering', () => {
     expect(container.querySelector('.node-signature')).toBeNull();
     expect(screen.queryByText(dto.detail)).toBeNull();
   });
+
+  it('shows whole-node resize controls only while Source is expanded', () => {
+    const collapsed: FunctionNodeDto = {
+      kind: 'function',
+      id: 'fn:inspect',
+      label: 'inspect',
+      detail: 'pub(crate) fn inspect() -> Result<()>',
+      symbolKind: 11,
+      uri: 'file:///workspace/src/lib.rs',
+      range: { start: { line: 4, character: 0 }, end: { line: 8, character: 1 } },
+      selectionRange: { start: { line: 4, character: 14 }, end: { line: 4, character: 21 } },
+      external: false,
+      sourceAvailable: true,
+      incoming: 'idle',
+      outgoing: 'idle',
+      hasMoreIncoming: false,
+      hasMoreOutgoing: false
+    };
+    const expanded: FunctionNodeDto = {
+      ...collapsed,
+      source: {
+        text: 'pub(crate) fn inspect() -> Result<()> {\n    Ok(())\n}',
+        startLine: 4,
+        startCharacter: 0,
+        semanticTokens: [],
+        relationships: []
+      }
+    };
+    const data = (dto: FunctionNodeDto): RustNodeData => ({
+      dto,
+      root: false,
+      focused: false,
+      canGoBack: false,
+      incomingActive: false,
+      outgoingActive: false,
+      proximityTarget: false,
+      actions
+    });
+
+    const { container, rerender } = render(
+      <ReactFlowProvider>
+        <RustNode data={data(collapsed)} />
+      </ReactFlowProvider>
+    );
+    expect(container.querySelector('.node-resize-handle')).toBeNull();
+
+    rerender(
+      <ReactFlowProvider>
+        <RustNode data={data(expanded)} />
+      </ReactFlowProvider>
+    );
+    expect(container.querySelector('.node-resize-handle')).toBeTruthy();
+    expect(container.querySelector('.node-resize-line')).toBeTruthy();
+  });
 });

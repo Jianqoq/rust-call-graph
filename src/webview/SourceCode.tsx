@@ -45,6 +45,7 @@ export function clampedSourceHandleRightInset(
 export function SourceCode({ nodeId, source, sourceHover, actions }: SourceCodeProps) {
   const updateNodeInternals = useUpdateNodeInternals();
   const updateFrame = useRef<number | undefined>(undefined);
+  const updateInternalsAfterFrame = useRef(false);
   const sourceShell = useRef<HTMLDivElement>(null);
   const hoverRequestTimer = useRef<number | undefined>(undefined);
   const hoverCloseTimer = useRef<number | undefined>(undefined);
@@ -107,16 +108,20 @@ export function SourceCode({ nodeId, source, sourceHover, actions }: SourceCodeP
     }, 320);
   }, [actions, cancelHoverTimers, nodeId]);
 
-  const refreshHandles = useCallback(() => {
+  const refreshHandles = useCallback((includeNodeInternals = true) => {
+    updateInternalsAfterFrame.current ||= includeNodeInternals;
     if (updateFrame.current !== undefined) {
-      window.cancelAnimationFrame(updateFrame.current);
+      return;
     }
     updateFrame.current = window.requestAnimationFrame(() => {
       updateFrame.current = undefined;
       if (sourceShell.current !== null) {
         clampRelationshipHandles(sourceShell.current);
       }
-      updateNodeInternals(nodeId);
+      if (updateInternalsAfterFrame.current) {
+        updateInternalsAfterFrame.current = false;
+        updateNodeInternals(nodeId);
+      }
     });
   }, [nodeId, updateNodeInternals]);
 
@@ -134,7 +139,7 @@ export function SourceCode({ nodeId, source, sourceHover, actions }: SourceCodeP
     if (sourceShell.current === null || typeof ResizeObserver === 'undefined') {
       return;
     }
-    const observer = new ResizeObserver(refreshHandles);
+    const observer = new ResizeObserver(() => refreshHandles(false));
     observer.observe(sourceShell.current);
     const code = sourceShell.current.querySelector('.source-code');
     if (code !== null) {
