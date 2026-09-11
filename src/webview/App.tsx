@@ -44,7 +44,7 @@ import { edgeIsVisible, edgeRevealMode, edgeStrokeStyle, nodeHoverEdgeTarget } f
 import { directionIsActive, directionKey, visibleGraph } from './graphView.js';
 import type { BaseFlowNode, HoveredRelationship, NodeActions, RustFlowNode, SourceHoverData } from './graphTypes.js';
 import { activeInspectionRelationships, clearNodeSelection, nextPinnedRelationship, pinnedRelationshipAfterSourceToggle, promoteRecentRelationship } from './interactionState.js';
-import { finishGridDrag, layoutGraph, makeRoomForExpandedSources, previewGridDrag, reorderRecentTargetsInGrid, type Point, type Size } from './layout.js';
+import { alignNewestTargetsToEndpoints, finishGridDrag, layoutGraph, makeRoomForExpandedSources, previewGridDrag, reorderRecentTargetsInGrid, type Point, type Size } from './layout.js';
 import { NODE_INTERACTION } from './nodeInteraction.js';
 import {
   EXPANDED_NODE_DEFAULT_WIDTH,
@@ -359,7 +359,12 @@ function GraphSurface() {
     const visibleExpandedIds = new Set(reorderedBoxes
       .filter(box => expandedSourceIds.current.has(box.id))
       .map(box => box.id));
-    const positions = makeRoomForExpandedSources(reorderedBoxes, visibleExpandedIds);
+    const reflowed = makeRoomForExpandedSources(reorderedBoxes, visibleExpandedIds);
+    const reflowedBoxes = reorderedBoxes.map(box => ({
+      ...box,
+      position: reflowed.get(box.id) ?? box.position
+    }));
+    const positions = alignNewestTargetsToEndpoints(reflowedBoxes, recentRelationships);
     const inspectionTargetIds = new Set(inspectionRelationships.map(relationship => relationship.targetNodeId));
 
     return visibleBaseNodes.map(node => {

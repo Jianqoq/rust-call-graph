@@ -149,9 +149,10 @@ function makeHorizontalRoom(
 
 /**
  * Reassigns existing cells within each target column by visit recency. The
- * newest target receives the cell vertically closest to the source node, and
- * older targets take progressively farther cells. X coordinates and the set
- * of Y coordinates are invariant, so the result cannot escape the grid.
+ * newest target receives the cell that best aligns its left/right endpoint
+ * with the source panel endpoint; older targets take progressively farther
+ * cells. X coordinates and the set of Y coordinates are invariant, so the
+ * result cannot escape the grid.
  */
 export function reorderRecentTargetsInGrid(
   nodes: readonly LayoutBox[],
@@ -173,6 +174,85 @@ export function reorderRecentTargetsInGrid(
     }));
   }
   return new Map(arranged.map(node => [node.id, node.position]));
+}
+
+/**
+ * Moves each origin's newest target so its left/right endpoint shares the
+ * source panel's endpoint Y. Other nodes in that column keep their x and are
+ * pushed only when they would overlap the snapped target.
+ */
+export function alignNewestTargetsToEndpoints(
+  nodes: readonly LayoutBox[],
+  relationships: readonly InspectionRelationship[]
+): ReadonlyMap<string, Point> {
+  const originIds = relationships
+    .map(relationship => relationship.originNodeId)
+    .filter((id, index, ids) => ids.indexOf(id) === index)
+    .reverse();
+  let arranged = nodes.map(node => ({ ...node, position: { ...node.position } }));
+  for (const originId of originIds) {
+    const newest = relationships.find(relationship =>
+      relationship.originNodeId === originId && relationship.targetNodeId !== originId
+    );
+    if (newest === undefined) {
+      continue;
+    }
+    arranged = snapTargetToOriginEndpoint(arranged, originId, newest.targetNodeId);
+  }
+  return new Map(arranged.map(node => [node.id, node.position]));
+}
+
+function snapTargetToOriginEndpoint(
+  nodes: readonly LayoutBox[],
+  originId: string,
+  targetId: string
+): LayoutBox[] {
+  const origin = nodes.find(node => node.id === originId);
+  const target = nodes.find(node => node.id === targetId);
+  if (origin === undefined || target === undefined) {
+    return nodes.map(node => ({ ...node, position: { ...node.position } }));
+  }
+
+  const snapped: LayoutBox = {
+    ...target,
+    position: {
+      x: target.position.x,
+      y: endpointY(origin.position, origin.size) - target.size.height / 2
+    }
+  };
+  const snappedCenter = endpointY(snapped.position, snapped.size);
+  const column = nodes
+    .filter(node =>
+      node.id !== targetId
+      && node.id !== originId
+      && sameColumn(node.position.x, snapped.position.x)
+    )
+    .map(node => ({ ...node, position: { ...node.position } }));
+  const above = column
+    .filter(node => endpointY(node.position, node.size) < snappedCenter)
+    .sort((left, right) => right.position.y - left.position.y);
+  const below = column
+    .filter(node => endpointY(node.position, node.size) >= snappedCenter)
+    .sort((left, right) => left.position.y - right.position.y);
+
+  let limit = snapped.position.y;
+  for (const node of above) {
+    const maxY = limit - SOURCE_VERTICAL_CLEARANCE - node.size.height;
+    node.position = { x: node.position.x, y: Math.min(node.position.y, maxY) };
+    limit = node.position.y;
+  }
+  limit = snapped.position.y + snapped.size.height;
+  for (const node of below) {
+    const minY = limit + SOURCE_VERTICAL_CLEARANCE;
+    node.position = { x: node.position.x, y: Math.max(node.position.y, minY) };
+    limit = node.position.y + node.size.height;
+  }
+
+  const relocated = new Map<string, LayoutBox>([
+    [snapped.id, snapped],
+    ...above.concat(below).map(node => [node.id, node] as const)
+  ]);
+  return nodes.map(node => relocated.get(node.id) ?? { ...node, position: { ...node.position } });
 }
 
 function reorderOneOriginTargets(
@@ -203,15 +283,20 @@ function reorderOneOriginTargets(
       const target = nodes.find(node => node.id === id);
       return target !== undefined && sameColumn(target.position.x, columnX);
     });
-    const nearestCells = columnNodes
-      .map(node => ({ ...node.position }))
-      .sort((left, right) =>
-        Math.abs(left.y - origin.position.y) - Math.abs(right.y - origin.position.y)
+    const originEndpoint = endpointY(origin.position, origin.size);
+    const availableCells = columnNodes.map(node => ({ ...node.position }));
+    const assignedCellKeys = new Set<string>();
+    for (const targetId of columnTargetIds) {
+      const target = nodes.find(node => node.id === targetId);
+      if (target === undefined || availableCells.length === 0) {
+        break;
+      }
+      availableCells.sort((left, right) =>
+        endpointDistance(left, target.size, originEndpoint)
+        - endpointDistance(right, target.size, originEndpoint)
         || left.y - right.y
       );
-    const assignedCellKeys = new Set<string>();
-    for (const [index, targetId] of columnTargetIds.entries()) {
-      const cell = nearestCells[index];
+      const cell = availableCells.shift();
       if (cell === undefined) {
         break;
       }
@@ -376,6 +461,14 @@ function nearestRowIndex(rows: readonly number[], desiredY: number): number {
     }
   }
   return nearest;
+}
+
+function endpointY(position: Point, size: Size): number {
+  return position.y + size.height / 2;
+}
+
+function endpointDistance(cell: Point, targetSize: Size, originEndpoint: number): number {
+  return Math.abs(endpointY(cell, targetSize) - originEndpoint);
 }
 
 function sameColumn(left: number, right: number): boolean {

@@ -124,11 +124,6 @@ export function SourceCode({
         }
       }}
     >
-      <div className="source-legend" aria-hidden="true">
-        <span><i className="legend-call" /> call</span>
-        <span><i className="legend-reference" /> reference</span>
-        <span className="source-hint">{definitionModifierHint(definitionClickModifier, navigator.platform)}. Double-click a call to follow</span>
-      </div>
       <pre className={`source-code${modifierHeld ? ' is-definition-modifier' : ''}`}>
         {lines.map(line => (
           <span className="source-line" key={line.number}>

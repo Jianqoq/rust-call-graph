@@ -1,7 +1,6 @@
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import { Handle, NodeResizer, Position, useUpdateNodeInternals } from '@xyflow/react';
 import {
-  Braces,
   Check,
   ChevronDown,
   ChevronUp,
@@ -9,7 +8,6 @@ import {
   CornerUpLeft,
   ExternalLink,
   Focus,
-  GitBranch,
   ListTree,
   MoreHorizontal
 } from 'lucide-react';
@@ -84,9 +82,6 @@ function NodeHeader({ data }: { readonly data: RustNodeData }) {
   const { dto } = data;
   return (
     <header className="node-header">
-      <div className={`node-kind-icon node-kind-${dto.kind}`} aria-hidden="true">
-        {dto.kind === 'function' ? <GitBranch /> : <Braces />}
-      </div>
       <div className="node-title-block">
         <div className="node-kicker">
           {dto.kind === 'function' ? 'function' : dto.typeKind}

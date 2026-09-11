@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GraphSnapshotDto } from '../src/shared/protocol.js';
-import { finishGridDrag, layoutGraph, makeRoomForExpandedSources, previewGridDrag, reorderRecentTargetsInGrid } from '../src/webview/layout.js';
+import { alignNewestTargetsToEndpoints, finishGridDrag, layoutGraph, makeRoomForExpandedSources, previewGridDrag, reorderRecentTargetsInGrid } from '../src/webview/layout.js';
 
 const position = { line: 0, character: 0 };
 const range = { start: position, end: position };
@@ -131,7 +131,7 @@ describe('layoutGraph', () => {
     expect(layout.get('below')).toEqual({ x: 17, y: 261 });
   });
 
-  it('assigns recent targets to same-column cells from newest and nearest to oldest and farthest', () => {
+  it('assigns recent targets to same-column cells that align with the source endpoint', () => {
     const boxes = [
       { id: 'origin', position: { x: 0, y: 0 }, size: { width: 660, height: 560 } },
       { id: 'first', position: { x: 710, y: -183 }, size: { width: 338, height: 120 } },
@@ -145,9 +145,9 @@ describe('layoutGraph', () => {
       { originNodeId: 'origin', targetNodeId: 'first' }
     ]);
 
-    expect(layout.get('third')).toEqual({ x: 710, y: 0 });
-    expect(layout.get('second')).toEqual({ x: 710, y: -183 });
-    expect(layout.get('first')).toEqual({ x: 710, y: 183 });
+    expect(layout.get('third')).toEqual({ x: 710, y: 183 });
+    expect(layout.get('second')).toEqual({ x: 710, y: 0 });
+    expect(layout.get('first')).toEqual({ x: 710, y: -183 });
     expect(layout.get('far-column')).toEqual({ x: 1259, y: 0 });
     expect(new Set(['first', 'second', 'third'].map(id => layout.get(id)?.y))).toEqual(new Set([-183, 0, 183]));
   });
@@ -155,13 +155,14 @@ describe('layoutGraph', () => {
   it('moves a target only among the bounded cells of its existing column', () => {
     const layout = reorderRecentTargetsInGrid([
       { id: 'origin', position: { x: 0, y: 183 }, size: { width: 660, height: 560 } },
-      { id: 'near', position: { x: 1098, y: -366 }, size: { width: 338, height: 120 } },
-      { id: 'target', position: { x: 1098, y: 366 }, size: { width: 338, height: 120 } },
+      { id: 'near', position: { x: 1098, y: 366 }, size: { width: 338, height: 120 } },
+      { id: 'target', position: { x: 1098, y: -366 }, size: { width: 338, height: 120 } },
       { id: 'middle', position: { x: 1098, y: 183 }, size: { width: 338, height: 120 } }
     ], [{ originNodeId: 'origin', targetNodeId: 'target' }]);
 
-    expect(layout.get('target')).toEqual({ x: 1098, y: 183 });
-    expect(layout.get('middle')).toEqual({ x: 1098, y: 366 });
+    expect(layout.get('target')).toEqual({ x: 1098, y: 366 });
+    expect(layout.get('middle')).toEqual({ x: 1098, y: -366 });
+    expect(layout.get('near')).toEqual({ x: 1098, y: 183 });
     expect(Math.min(...[...layout.values()].map(point => point.y))).toBe(-366);
     expect(Math.max(...[...layout.values()].map(point => point.y))).toBe(366);
   });
@@ -179,7 +180,34 @@ describe('layoutGraph', () => {
     ]);
 
     expect(layout.get('installed')).toEqual({ x: 710, y: 0 });
-    expect(layout.get('current-exe')).toEqual({ x: 1259, y: 0 });
+    expect(layout.get('current-exe')).toEqual({ x: 1259, y: 183 });
+  });
+
+  it('snaps the newest target so its endpoint matches the source panel endpoint', () => {
+    const layout = alignNewestTargetsToEndpoints([
+      { id: 'origin', position: { x: 0, y: 0 }, size: { width: 660, height: 240 } },
+      { id: 'target', position: { x: 710, y: 0 }, size: { width: 338, height: 120 } },
+      { id: 'neighbor', position: { x: 710, y: 183 }, size: { width: 338, height: 120 } }
+    ], [{ originNodeId: 'origin', targetNodeId: 'target' }]);
+
+    expect(layout.get('target')).toEqual({ x: 710, y: 60 });
+    expect((layout.get('target')?.y ?? 0) + 60).toBe(120);
+    expect(layout.get('neighbor')?.y).toBeGreaterThanOrEqual(204);
+    expect(layout.get('origin')).toEqual({ x: 0, y: 0 });
+  });
+
+  it('aligns a second-hop target to the promoted parent endpoint', () => {
+    const layout = alignNewestTargetsToEndpoints([
+      { id: 'inspect', position: { x: 0, y: 0 }, size: { width: 660, height: 240 } },
+      { id: 'installed', position: { x: 710, y: 0 }, size: { width: 660, height: 240 } },
+      { id: 'current-exe', position: { x: 1259, y: 183 }, size: { width: 338, height: 120 } }
+    ], [
+      { originNodeId: 'installed', targetNodeId: 'current-exe' },
+      { originNodeId: 'inspect', targetNodeId: 'installed' }
+    ]);
+
+    expect(layout.get('installed')).toEqual({ x: 710, y: 0 });
+    expect(layout.get('current-exe')).toEqual({ x: 1259, y: 60 });
   });
 
   it('moves every cell in a column together during horizontal drag', () => {
