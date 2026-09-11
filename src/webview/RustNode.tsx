@@ -11,6 +11,7 @@ import {
   ListTree,
   MoreHorizontal
 } from 'lucide-react';
+import { memo } from 'react';
 import type { FunctionNodeDto, FunctionExpansionState, TypeNodeDto } from '../shared/protocol.js';
 import type { RustNodeData } from './graphTypes.js';
 import {
@@ -21,7 +22,7 @@ import {
 } from './nodeSizing.js';
 import { SourceCode } from './SourceCode.js';
 
-export function RustNode({ data, selected }: { readonly data: RustNodeData; readonly selected?: boolean }) {
+function RustNodeComponent({ data, selected }: { readonly data: RustNodeData; readonly selected?: boolean }) {
   const { dto, actions } = data;
   const updateNodeInternals = useUpdateNodeInternals();
   return (
@@ -211,3 +212,5 @@ function shortLocation(uri: string, zeroBasedLine: number): string {
   const segments = path.split('/').filter(Boolean);
   return `${segments.slice(-2).join('/')}:${zeroBasedLine + 1}`;
 }
+
+export const RustNode = memo(RustNodeComponent);

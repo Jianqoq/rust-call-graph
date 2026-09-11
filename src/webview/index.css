@@ -244,10 +244,6 @@ button:focus-visible,
   cursor: default;
 }
 
-.react-flow__node-rustNode:not(.dragging) {
-  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
 .react-flow__node-rustNode.flow-node-external .rust-node {
   background: color-mix(in srgb, var(--graph-panel) 86%, var(--graph-bg));
 }
@@ -263,7 +259,7 @@ button:focus-visible,
   border-radius: var(--graph-radius);
   box-shadow: var(--graph-shadow);
   cursor: default;
-  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease, width 160ms ease;
+  transition: border-color 120ms ease, box-shadow 120ms ease, width 160ms ease;
 }
 
 .rust-node:has(.source-shell) {
@@ -274,7 +270,7 @@ button:focus-visible,
   min-height: 240px;
   box-sizing: border-box;
   flex-direction: column;
-  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
 .node-resize-line {

@@ -46,6 +46,7 @@ import type { BaseFlowNode, HoveredRelationship, NodeActions, RustFlowNode, Sour
 import { activeInspectionRelationships, clearNodeSelection, nextPinnedRelationship, pinnedRelationshipAfterSourceToggle, promoteRecentRelationship } from './interactionState.js';
 import { alignNewestTargetsToEndpoints, finishGridDrag, layoutGraph, makeRoomForExpandedSources, previewGridDrag, reorderRecentTargetsInGrid, type Point, type Size } from './layout.js';
 import { NODE_INTERACTION } from './nodeInteraction.js';
+import { viewportCullFields } from './nodeGeometry.js';
 import {
   EXPANDED_NODE_DEFAULT_WIDTH,
   EXPANDED_NODE_MIN_HEIGHT,
@@ -371,13 +372,15 @@ function GraphSurface() {
       const dto = node.data.dto;
       const position = positions.get(node.id) ?? node.position;
       const expanded = dto.kind === 'function' && dto.source !== undefined;
-      const size = sizes.get(node.id);
+      const size = sizes.get(node.id) ?? effectiveNodeSize(node, expanded, measuredSizes.current.get(node.id));
+      const cull = viewportCullFields(size);
       return {
         ...node,
         position,
-        ...(expanded && size !== undefined
-          ? { style: { ...node.style, width: size.width, height: size.height } }
-          : {}),
+        width: cull.width,
+        height: cull.height,
+        handles: cull.handles,
+        style: { ...node.style, ...cull.style },
         data: {
           ...node.data,
           root: node.id === snapshot?.rootId,
@@ -662,6 +665,7 @@ function GraphSurface() {
         onMoveEnd={(_, viewport) => persistView(baseNodes, baselinePositions.current, viewport)}
         minZoom={0.18}
         maxZoom={2}
+        onlyRenderVisibleElements
         fitViewOptions={{ padding: 0.25, minZoom: INITIAL_READABLE_ZOOM }}
         nodesFocusable
         edgesFocusable={false}
@@ -745,14 +749,20 @@ function reconcileNodes(
     for (const node of snapshot.nodes) {
       baselinePositions.set(node.id, positions.get(node.id) ?? { x: 0, y: 0 });
     }
-    const nodes: BaseFlowNode[] = snapshot.nodes.map(dto => ({
-      id: dto.id,
-      type: 'rustNode',
-      position: baselinePositions.get(dto.id) ?? { x: 0, y: 0 },
-      data: { dto },
-      ...NODE_INTERACTION,
-      className: dto.kind === 'function' && dto.external ? 'flow-node-external' : ''
-    }));
+    const nodes: BaseFlowNode[] = snapshot.nodes.map(dto => {
+      const expanded = dto.kind === 'function' && dto.source !== undefined;
+      const size = effectiveNodeSize({ data: { dto } } as BaseFlowNode, expanded, undefined);
+      const cull = viewportCullFields(size);
+      return {
+        id: dto.id,
+        type: 'rustNode' as const,
+        position: baselinePositions.get(dto.id) ?? { x: 0, y: 0 },
+        data: { dto },
+        ...NODE_INTERACTION,
+        ...cull,
+        className: dto.kind === 'function' && dto.external ? 'flow-node-external' : ''
+      };
+    });
     return nodes;
   });
 }
