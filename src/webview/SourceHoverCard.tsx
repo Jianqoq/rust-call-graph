@@ -15,6 +15,13 @@ interface RenderBlock {
   readonly language?: string;
 }
 
+export type InlineMarkdownSpan =
+  | { readonly kind: 'text'; readonly value: string }
+  | { readonly kind: 'code'; readonly value: string }
+  | { readonly kind: 'codeLink'; readonly value: string }
+  | { readonly kind: 'bold'; readonly value: string }
+  | { readonly kind: 'link'; readonly value: string };
+
 export function SourceHoverCard({
   anchor,
   blocks,
@@ -122,35 +129,57 @@ function renderHoverCode(value: string, language: string | undefined): ReactNode
   if (!isRustHoverLanguage(language)) {
     return value;
   }
-  return highlightRustSegments(value).map((segment, index) => (
+  return highlightRustSegments(value, { rainbowBrackets: false, colorTypeParameters: true }).map((segment, index) => (
     segment.token === undefined
       ? <Fragment key={index}>{segment.text}</Fragment>
       : <span className={semanticTokenClassName(segment.token)} key={index}>{segment.text}</span>
   ));
 }
 
-function renderInlineMarkdown(value: string): readonly ReactNode[] {
-  const pattern = /(`[^`\n]+`|\*\*[^*\n]+\*\*|\[[^\]\n]+\]\([^)\n]+\))/g;
-  const nodes: ReactNode[] = [];
+export function parseInlineMarkdown(value: string): readonly InlineMarkdownSpan[] {
+  const pattern = /(`[^`\n]+`|\*\*[^*\n]+\*\*|\[`[^`\n]+`\]\([^)\n]+\)|\[[^\]\n]+\]\([^)\n]+\))/g;
+  const spans: InlineMarkdownSpan[] = [];
   let cursor = 0;
   for (const match of value.matchAll(pattern)) {
     const index = match.index;
     if (index > cursor) {
-      nodes.push(value.slice(cursor, index));
+      spans.push({ kind: 'text', value: value.slice(cursor, index) });
     }
     const token = match[0];
     if (token.startsWith('`')) {
-      nodes.push(<code key={index}>{token.slice(1, -1)}</code>);
+      spans.push({ kind: 'code', value: token.slice(1, -1) });
     } else if (token.startsWith('**')) {
-      nodes.push(<strong key={index}>{token.slice(2, -2)}</strong>);
+      spans.push({ kind: 'bold', value: token.slice(2, -2) });
     } else {
-      const label = /^\[([^\]]+)\]/.exec(token)?.[1] ?? token;
-      nodes.push(<span className="source-language-hover-link" key={index}>{label}</span>);
+      const codeLink = /^\[`([^`\n]+)`\]\([^)\n]+\)$/.exec(token);
+      if (codeLink?.[1] !== undefined) {
+        spans.push({ kind: 'codeLink', value: codeLink[1] });
+      } else {
+        spans.push({ kind: 'link', value: /^\[([^\]]+)\]/.exec(token)?.[1] ?? token });
+      }
     }
     cursor = index + token.length;
   }
   if (cursor < value.length) {
-    nodes.push(value.slice(cursor));
+    spans.push({ kind: 'text', value: value.slice(cursor) });
   }
-  return nodes.map((node, index) => <Fragment key={index}>{node}</Fragment>);
+  return spans;
+}
+
+function renderInlineMarkdown(value: string): readonly ReactNode[] {
+  return parseInlineMarkdown(value).map((span, index) => {
+    if (span.kind === 'codeLink') {
+      return <span className="source-language-hover-link" key={index}><code>{span.value}</code></span>;
+    }
+    if (span.kind === 'code') {
+      return <code key={index}>{span.value}</code>;
+    }
+    if (span.kind === 'bold') {
+      return <strong key={index}>{span.value}</strong>;
+    }
+    if (span.kind === 'link') {
+      return <span className="source-language-hover-link" key={index}>{span.value}</span>;
+    }
+    return <Fragment key={index}>{span.value}</Fragment>;
+  });
 }

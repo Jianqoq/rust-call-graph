@@ -17,6 +17,7 @@ describe('active VS Code theme syntax palette', () => {
         { scopes: ['entity.name.function'], foreground: '#61AFEF' },
         { scopes: ['entity.name.type'], foreground: '#E5C07B' },
         { scopes: ['entity.name.type.rust'], foreground: '#56B6C2' },
+        { scopes: ['constant'], foreground: '#D19A66' },
         { scopes: ['variable'], foreground: '#E06C75' },
         { scopes: ['variable.parameter'], foreground: '#ABB2BF' },
         { scopes: ['string'], foreground: '#98C379' },
@@ -36,6 +37,8 @@ describe('active VS Code theme syntax palette', () => {
     expect(palette.macro).toBe('#61AFEF');
     expect(palette.type).toBe('#56B6C2');
     expect(palette.enumMember).toBe('#E5C07B');
+    expect(palette.builtinType).toBe('#E5C07B');
+    expect(palette.constant).toBe('#D19A66');
     expect(palette.namespace).toBe('#ABB2BF');
     expect(palette.variable).toBe('#E06C75');
     expect(palette.parameter).toBe('#E06C75');

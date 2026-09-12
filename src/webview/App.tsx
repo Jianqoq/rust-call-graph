@@ -61,7 +61,6 @@ const nodeTypes: NodeTypes = {
 const edgeTypes: EdgeTypes = {
   bundled: BundledEdge
 };
-const INITIAL_READABLE_ZOOM = 0.7;
 
 interface NavigationEntry {
   readonly nodeId: string;
@@ -105,7 +104,7 @@ function GraphSurface() {
   const [sourceHover, setSourceHover] = useState<SourceHoverData>();
   const [definitionClickModifier, setDefinitionClickModifier] = useState<DefinitionClickModifier>('ctrlCmd');
   const sourceHoverRequestId = useRef(0);
-  const initialViewApplied = useRef(false);
+  const initialViewport = useRef<Viewport | undefined>(undefined);
   const baselinePositions = useRef(new Map<string, Point>());
   const measuredSizes = useRef(new Map<string, Size>());
   const expandedSourceIds = useRef<ReadonlySet<string>>(new Set());
@@ -175,10 +174,7 @@ function GraphSurface() {
 
   const hoverRelationship = useCallback((relationship: HoveredRelationship | undefined) => {
     setHoveredRelationship(relationship);
-    if (relationship !== undefined) {
-      rememberRelationship(relationship);
-    }
-  }, [rememberRelationship]);
+  }, []);
 
   const pinRelationship = useCallback((relationship: HoveredRelationship) => {
     rememberRelationship(relationship);
@@ -240,11 +236,18 @@ function GraphSurface() {
     goBack,
     hoverRelationship,
     pinRelationship,
-    followRelationship: (originNodeId, targetNodeId) => focusGraphNode(targetNodeId, originNodeId),
+    followRelationship: (originNodeId, targetNodeId) => {
+      rememberRelationship({
+        edgeId: `${originNodeId}->${targetNodeId}`,
+        originNodeId,
+        targetNodeId
+      });
+      focusGraphNode(targetNodeId, originNodeId);
+    },
     requestSourceHover,
     openDefinition: (nodeId, sourceOffset) => bridge.postMessage({ type: 'openDefinition', nodeId, sourceOffset }),
     clearSourceHover
-  }), [clearSourceHover, focusGraphNode, goBack, hoverRelationship, pinRelationship, requestSourceHover, toggleFunctionDirection]);
+  }), [clearSourceHover, focusGraphNode, goBack, hoverRelationship, pinRelationship, rememberRelationship, requestSourceHover, toggleFunctionDirection]);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent<HostToWebviewMessage>): void => {
@@ -289,27 +292,6 @@ function GraphSurface() {
     bridge.postMessage({ type: 'ready' });
     return () => window.removeEventListener('message', onMessage);
   }, []);
-
-  useEffect(() => {
-    if (snapshot === undefined || initialViewApplied.current || baseNodes.length === 0) {
-      return;
-    }
-    const saved = bridge.getState()?.viewport;
-    const timer = window.setTimeout(() => {
-      initialViewApplied.current = true;
-      if (saved !== undefined) {
-        void flow.setViewport(saved);
-      } else {
-        void flow.fitView({
-          padding: 0.25,
-          duration: reducedMotion ? 0 : 240,
-          minZoom: INITIAL_READABLE_ZOOM,
-          maxZoom: 1.2
-        });
-      }
-    }, 180);
-    return () => window.clearTimeout(timer);
-  }, [baseNodes.length, flow, reducedMotion, snapshot]);
 
   useEffect(() => {
     if (baseNodes.length === 0) {
@@ -629,7 +611,7 @@ function GraphSurface() {
     setAnnouncement('Pinned relationships cleared.');
   }, []);
 
-  if (snapshot === undefined) {
+  if (snapshot === undefined || baseNodes.length === 0) {
     return (
       <main className="graph-loading" aria-live="polite">
         <LoaderCircle className="spin" aria-hidden="true" />
@@ -637,6 +619,13 @@ function GraphSurface() {
         <p>Waiting for the active language provider.</p>
       </main>
     );
+  }
+
+  if (initialViewport.current === undefined) {
+    const rootNode = nodes.find(node => node.id === snapshot.rootId);
+    if (rootNode !== undefined) {
+      initialViewport.current = viewportCenteringNode(rootNode, measuredSizes.current.get(rootNode.id));
+    }
   }
 
   return (
@@ -654,7 +643,7 @@ function GraphSurface() {
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        fitView
+        defaultViewport={initialViewport.current ?? { x: 0, y: 0, zoom: 1 }}
         onNodesChange={onNodesChange}
         onNodeDragStart={onNodeDragStart}
         onNodeDragStop={onNodeDragStop}
@@ -666,7 +655,6 @@ function GraphSurface() {
         minZoom={0.18}
         maxZoom={2}
         onlyRenderVisibleElements
-        fitViewOptions={{ padding: 0.25, minZoom: INITIAL_READABLE_ZOOM }}
         nodesFocusable
         edgesFocusable={false}
         proOptions={{ hideAttribution: true }}
@@ -765,6 +753,19 @@ function reconcileNodes(
     });
     return nodes;
   });
+}
+
+function viewportCenteringNode(node: BaseFlowNode, measured: Size | undefined): Viewport {
+  const expanded = node.data.dto.kind === 'function' && node.data.dto.source !== undefined;
+  const visualViewport = window.visualViewport;
+  return centeredNodeViewport(
+    node.position,
+    effectiveNodeSize(node, expanded, measured),
+    {
+      width: visualViewport?.width ?? window.innerWidth,
+      height: visualViewport?.height ?? window.innerHeight
+    }
+  );
 }
 
 function effectiveNodeSize(node: BaseFlowNode, expanded: boolean, measured: Size | undefined): Size {

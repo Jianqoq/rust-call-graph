@@ -1,5 +1,5 @@
 import type { SourceSemanticTokenDto } from '../shared/protocol.js';
-import { withRustSyntaxFallbacks, coveringSemanticToken } from './rustSyntaxFallback.js';
+import { withRustSyntaxFallbacks, coveringSemanticToken, type RustSyntaxFallbackOptions } from './rustSyntaxFallback.js';
 
 export interface HighlightedRustSegment {
   readonly text: string;
@@ -64,7 +64,7 @@ export function showsGotoDefinitionUnderline(
 export function semanticTokenClassName(token: SourceSemanticTokenDto): string {
   const tokenType = displayTokenType(token.tokenType).replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
   const modifiers = token.modifiers.map(modifier =>
-    `source-semantic-${modifier.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()}`
+    `source-mod-${modifier.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()}`
   );
   return ['source-semantic', `source-semantic-${tokenType}`, ...modifiers].join(' ');
 }
@@ -76,16 +76,18 @@ const DISPLAY_TOKEN_TYPES: Readonly<Record<string, string>> = {
   module: 'namespace',
   typeAlias: 'type',
   union: 'type',
-  selfTypeKeyword: 'keyword',
-  static: 'variable'
+  selfTypeKeyword: 'keyword'
 };
 
 function displayTokenType(tokenType: string): string {
   return DISPLAY_TOKEN_TYPES[tokenType] ?? tokenType;
 }
 
-export function highlightRustSegments(text: string): readonly HighlightedRustSegment[] {
-  const tokens = withRustSyntaxFallbacks(text, []).filter(item => item.endOffset > item.startOffset);
+export function highlightRustSegments(
+  text: string,
+  options: RustSyntaxFallbackOptions = {}
+): readonly HighlightedRustSegment[] {
+  const tokens = withRustSyntaxFallbacks(text, [], options).filter(item => item.endOffset > item.startOffset);
   const boundaries = new Set<number>([0, text.length]);
   for (const token of tokens) {
     boundaries.add(Math.max(0, token.startOffset));

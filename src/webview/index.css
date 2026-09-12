@@ -35,6 +35,8 @@
   --graph-syntax-macro: var(--graph-syntax-function);
   --graph-syntax-namespace: var(--vscode-editor-foreground, #d8dee9);
   --graph-syntax-enum-member: var(--graph-syntax-type);
+  --graph-syntax-builtin-type: var(--graph-syntax-enum-member);
+  --graph-syntax-constant: var(--graph-syntax-number);
   --graph-syntax-bracket1: #ffd700;
   --graph-syntax-bracket2: #da70d6;
   --graph-syntax-bracket3: #179fff;
@@ -557,9 +559,12 @@ button:focus-visible,
 .source-semantic.source-semantic-enum,
 .source-semantic.source-semantic-interface,
 .source-semantic.source-semantic-type,
-.source-semantic.source-semantic-type-parameter,
-.source-semantic.source-semantic-builtin-type {
+.source-semantic.source-semantic-type-parameter {
   color: var(--graph-syntax-type);
+}
+
+.source-semantic.source-semantic-builtin-type {
+  color: var(--graph-syntax-builtin-type);
 }
 
 .source-semantic.source-semantic-namespace,
@@ -583,6 +588,13 @@ button:focus-visible,
 .source-semantic.source-semantic-property,
 .source-semantic.source-semantic-field {
   color: var(--graph-syntax-variable);
+}
+
+.source-semantic.source-semantic-const,
+.source-semantic.source-semantic-static,
+.source-semantic.source-semantic-const-parameter,
+.source-semantic.source-semantic-constant {
+  color: var(--graph-syntax-constant);
 }
 
 .source-semantic.source-semantic-self-keyword {
@@ -658,12 +670,12 @@ button:focus-visible,
   color: var(--graph-syntax-attribute);
 }
 
-.source-semantic-deprecated {
+.source-mod-deprecated {
   text-decoration: line-through;
   opacity: 0.72;
 }
 
-.source-semantic-documentation {
+.source-mod-documentation {
   font-style: italic;
 }
 
@@ -675,22 +687,10 @@ button:focus-visible,
   color: inherit;
   background: transparent;
   border: 0;
-  border-bottom: 1px solid color-mix(in srgb, currentColor 42%, transparent);
   border-radius: 0;
   cursor: pointer;
   font: inherit;
   line-height: inherit;
-}
-
-.source-relationship-call {
-  background: transparent;
-  border-bottom-color: color-mix(in srgb, currentColor 42%, transparent);
-}
-
-.source-relationship-reference {
-  background: transparent;
-  border-bottom-style: dashed;
-  border-bottom-color: color-mix(in srgb, currentColor 42%, transparent);
 }
 
 .source-relationship:hover,
@@ -710,9 +710,7 @@ button:focus-visible,
 }
 
 .source-code.is-definition-modifier .source-hover-anchor.is-definition-target:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  text-decoration-thickness: 1px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
 }
 
 .source-hover-anchor.is-language-hovered {
@@ -757,9 +755,9 @@ button:focus-visible,
 }
 
 .source-language-hover-content code {
-  padding: 1px 3px;
-  color: var(--vscode-textPreformat-foreground, var(--graph-text));
-  background: color-mix(in srgb, var(--graph-code-bg) 78%, transparent);
+  padding: 0 0.4em;
+  color: inherit;
+  background: var(--vscode-textCodeBlock-background, var(--graph-code-bg));
   border-radius: 3px;
   font-family: var(--vscode-editor-font-family, "Cascadia Code", Consolas, monospace);
 }
@@ -783,6 +781,15 @@ button:focus-visible,
   padding: 0;
   color: inherit;
   background: transparent;
+}
+
+.source-language-hover-code .source-semantic.source-semantic-type,
+.source-language-hover-code .source-semantic.source-semantic-struct,
+.source-language-hover-code .source-semantic.source-semantic-enum,
+.source-language-hover-code .source-semantic.source-semantic-class,
+.source-language-hover-code .source-semantic.source-semantic-interface,
+.source-language-hover-code .source-semantic.source-semantic-builtin-type {
+  color: var(--graph-syntax-enum-member);
 }
 
 .source-language-hover-link {
@@ -975,11 +982,4 @@ button:focus-visible,
     outline: 2px solid Highlight;
   }
 
-  .source-relationship-call {
-    border: 2px solid LinkText;
-  }
-
-  .source-relationship-reference {
-    border: 2px dashed LinkText;
-  }
 }

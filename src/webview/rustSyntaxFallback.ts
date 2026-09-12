@@ -36,17 +36,26 @@ const OPERATOR_LEXEMES = [
   '|', '&', '^', '!', '?', '=', '+', '-', '*', '/', '%', '@'
 ];
 
+export interface RustSyntaxFallbackOptions {
+  readonly rainbowBrackets?: boolean;
+  readonly colorTypeParameters?: boolean;
+}
+
 export function withRustSyntaxFallbacks(
   text: string,
-  semanticTokens: readonly SourceSemanticTokenDto[]
+  semanticTokens: readonly SourceSemanticTokenDto[],
+  options: RustSyntaxFallbackOptions = {}
 ): readonly SourceSemanticTokenDto[] {
+  const rainbowBrackets = options.rainbowBrackets !== false;
+  const colorTypeParameters = options.colorTypeParameters !== false;
   const opaque = semanticTokens.filter(item => !TEXTMATE_PASSTHROUGH_TYPES.has(item.tokenType));
-  const fallbacks = rustSyntaxFallbackTokens(text).filter(candidate =>
+  const fallbacks = rustSyntaxFallbackTokens(text, colorTypeParameters).filter(candidate =>
     !opaque.some(item => semanticBlocksFallback(item, candidate))
   );
+  const combined = [...opaque, ...fallbacks];
   return overlayOperatorTokens(
     text,
-    overlayBracketPairTokens(text, [...opaque, ...fallbacks])
+    rainbowBrackets ? overlayBracketPairTokens(text, combined) : sortTokens(combined)
   );
 }
 
@@ -73,7 +82,10 @@ export function coveringSemanticToken(
   return best?.token;
 }
 
-export function rustSyntaxFallbackTokens(text: string): readonly SourceSemanticTokenDto[] {
+export function rustSyntaxFallbackTokens(
+  text: string,
+  colorTypeParameters = true
+): readonly SourceSemanticTokenDto[] {
   const tokens: SourceSemanticTokenDto[] = [];
   let index = 0;
   let expectFunctionName = false;
@@ -158,9 +170,19 @@ export function rustSyntaxFallbackTokens(text: string): readonly SourceSemanticT
       } else if (RESULT_OPTION_VARIANTS.has(identifier)) {
         tokens.push(token(index, end, 'enumMember'));
         expectFunctionName = false;
-      } else if (PRIMITIVE_TYPES.has(identifier) || isTypeLikeIdentifier(identifier)) {
-        tokens.push(token(index, end, 'type'));
+      } else if (PRIMITIVE_TYPES.has(identifier)) {
+        tokens.push(token(index, end, 'builtinType'));
         expectFunctionName = false;
+      } else if (isConstantIdentifier(identifier)) {
+        tokens.push(token(index, end, 'const'));
+        expectFunctionName = false;
+      } else if (isTypeLikeIdentifier(identifier) && (colorTypeParameters || identifier.length > 1)) {
+        tokens.push(token(index, end, identifier.length === 1 ? 'typeParameter' : 'type'));
+        expectFunctionName = false;
+      } else if (isCallIdentifier(text, end)) {
+        tokens.push(token(index, end, 'function'));
+        expectFunctionName = false;
+        expectVariableName = false;
       } else if (expectFunctionName) {
         tokens.push(token(index, end, 'function'));
         expectFunctionName = false;
@@ -358,6 +380,15 @@ function semanticBlocksFallback(
   if (fallback.tokenType === 'enumMember' && semantic.tokenType !== 'enumMember') {
     return false;
   }
+  if (fallback.tokenType === 'builtinType' && semantic.tokenType !== 'builtinType') {
+    return false;
+  }
+  if (fallback.tokenType === 'const' && semantic.tokenType !== 'const' && semantic.tokenType !== 'static') {
+    return false;
+  }
+  if (fallback.tokenType === 'function' && semantic.tokenType !== 'function' && semantic.tokenType !== 'method') {
+    return false;
+  }
   return true;
 }
 
@@ -369,6 +400,18 @@ function isMacroInvocation(text: string, bangOffset: number): boolean {
     return false;
   }
   return /[\p{ID_Continue}_]/u.test(text[bangOffset - 1] ?? '');
+}
+
+function isCallIdentifier(text: string, end: number): boolean {
+  let index = end;
+  while (index < text.length && /\s/u.test(text[index] ?? '')) {
+    index += 1;
+  }
+  return text[index] === '(';
+}
+
+function isConstantIdentifier(identifier: string): boolean {
+  return identifier.length >= 2 && /^[A-Z][A-Z0-9_]*$/u.test(identifier);
 }
 
 function isTypeLikeIdentifier(identifier: string): boolean {

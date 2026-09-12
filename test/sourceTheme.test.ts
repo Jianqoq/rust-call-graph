@@ -31,6 +31,27 @@ describe('Source Expansion token palette', () => {
     expect(nested).toMatch(/color:\s*inherit/);
   });
 
+  it('paints hover fence types with TextMate gold instead of semantic cyan', () => {
+    expect(stylesheet).toMatch(
+      /\.source-language-hover-code \.source-semantic\.source-semantic-type,[\s\S]*?color:\s*var\(--graph-syntax-enum-member\)/
+    );
+  });
+
+  it('keeps hover generic parameters on the Rust type cyan, not enum gold', () => {
+    expect(stylesheet).toMatch(/source-semantic-type-parameter \{\s*color:\s*var\(--graph-syntax-type\)/);
+    expect(stylesheet).not.toMatch(
+      /\.source-language-hover-code \.source-semantic\.source-semantic-type-parameter/
+    );
+  });
+
+  it('paints hover inline code like VS Code hover: inherit text, code-block background', () => {
+    const rule = /\.source-language-hover-content code\s*\{([^}]*)\}/.exec(stylesheet)?.[1] ?? '';
+
+    expect(rule).toMatch(/color:\s*inherit/);
+    expect(rule).toMatch(/background:\s*var\(--vscode-textCodeBlock-background/);
+    expect(rule).not.toMatch(/textPreformat-foreground/);
+  });
+
   it('colors matching brackets from the injected palette instead of possibly transparent webview variables', () => {
     expect(stylesheet).toMatch(/--graph-syntax-bracket1:\s*#ffd700/);
     expect(stylesheet).toMatch(/\.source-semantic-bracket2\s*\{[^}]*color:\s*var\(--graph-syntax-bracket2\)/);
@@ -55,8 +76,20 @@ describe('Source Expansion token palette', () => {
     expect(stylesheet).not.toMatch(/source-semantic-enum-member \{\s*color:\s*var\(--graph-syntax-number\)/);
   });
 
-  it('underlines only the hovered definition target while the modifier is held', () => {
-    expect(stylesheet).toMatch(/\.is-definition-modifier \.source-hover-anchor\.is-definition-target:hover/);
-    expect(stylesheet).not.toMatch(/\.is-definition-modifier \.source-hover-anchor \{/);
+  it('colors primitive types separately from struct cyan, and caps constants separately from variables', () => {
+    expect(stylesheet).toMatch(/source-semantic-builtin-type \{\s*color:\s*var\(--graph-syntax-builtin-type\)/);
+    expect(stylesheet).not.toMatch(/source-semantic-builtin-type \{\s*color:\s*var\(--graph-syntax-type\)/);
+    expect(stylesheet).toMatch(/source-semantic-const,[\s\S]*?color:\s*var\(--graph-syntax-constant\)/);
+    expect(stylesheet).not.toMatch(/source-semantic-static \{\s*color:\s*var\(--graph-syntax-variable\)/);
+  });
+
+  it('does not let rust-analyzer static modifiers steal the function color', () => {
+    expect(stylesheet).not.toMatch(/source-mod-static \{\s*color:/);
+    expect(stylesheet).not.toMatch(/source-semantic-support-function/);
+  });
+
+  it('does not underline call sites or definition targets', () => {
+    expect(stylesheet).not.toMatch(/\.source-relationship[^{]*\{[^}]*border-bottom:/);
+    expect(stylesheet).not.toMatch(/text-decoration:\s*underline/);
   });
 });

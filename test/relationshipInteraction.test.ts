@@ -36,7 +36,7 @@ describe('source relationship selection', () => {
     expect(activeInspectionRelationships(pinned, hovered)).toEqual([pinned, hovered]);
   });
 
-  it('keeps the most recently hovered target first and demotes earlier targets', () => {
+  it('keeps the most recently selected target first and demotes earlier targets', () => {
     const first = { edgeId: 'edge:first', originNodeId: 'root', targetNodeId: 'first' };
     const second = { edgeId: 'edge:second', originNodeId: 'root', targetNodeId: 'second' };
     const third = { edgeId: 'edge:third', originNodeId: 'root', targetNodeId: 'third' };

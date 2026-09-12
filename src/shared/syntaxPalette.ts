@@ -34,6 +34,8 @@ export const FALLBACK_SYNTAX_PALETTE: SyntaxPaletteDto = {
   macro: '#DCDCAA',
   namespace: '#D4D4D4',
   enumMember: '#E5C07B',
+  builtinType: '#E5C07B',
+  constant: '#D19A66',
   ...DARK_BRACKET_PALETTE
 };
 
@@ -51,7 +53,9 @@ export const SYNTAX_TOKEN_KEYS = [
   'operator',
   'macro',
   'namespace',
-  'enumMember'
+  'enumMember',
+  'builtinType',
+  'constant'
 ] as const;
 
 export const SYNTAX_BRACKET_KEYS = [

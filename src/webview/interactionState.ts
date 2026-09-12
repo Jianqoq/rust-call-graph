@@ -37,7 +37,7 @@ export function activeInspectionRelationships(
   return [pinned, hovered];
 }
 
-/** Keeps the active browsing chain and each source's targets in newest-first order. */
+/** Keeps the active selected browsing chain and each source's targets in newest-first order. */
 export function promoteRecentRelationship(
   history: readonly HoveredRelationship[],
   relationship: HoveredRelationship

@@ -115,6 +115,8 @@ export interface SyntaxPaletteDto {
   readonly macro: string;
   readonly namespace: string;
   readonly enumMember: string;
+  readonly builtinType: string;
+  readonly constant: string;
   readonly bracket1: string;
   readonly bracket2: string;
   readonly bracket3: string;

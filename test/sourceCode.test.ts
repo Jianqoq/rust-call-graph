@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { FunctionSourceDto } from '../src/shared/protocol.js';
 import { buildSourceLines } from '../src/webview/SourceCode.js';
-import { semanticTokenClassName, isDefinitionNavigableToken, showsGotoDefinitionUnderline } from '../src/webview/sourceHighlight.js';
+import { highlightRustSegments, semanticTokenClassName, isDefinitionNavigableToken, showsGotoDefinitionUnderline } from '../src/webview/sourceHighlight.js';
+import { parseInlineMarkdown } from '../src/webview/SourceHoverCard.js';
 
 describe('buildSourceLines', () => {
   it('keeps two calls to one function as independently addressable source ranges', () => {
@@ -350,6 +351,79 @@ describe('buildSourceLines', () => {
     ]));
   });
 
+  it('colors associated function names in Type::function() like VS Code', () => {
+    const text = 'fn restore() { Vec::with_capacity(entry_points.len()); }';
+    const source: FunctionSourceDto = {
+      text,
+      startLine: 0,
+      startCharacter: 0,
+      relationships: [],
+      semanticTokens: []
+    };
+
+    const renderedTokens = buildSourceLines(source).flatMap(line => line.segments.flatMap(segment => {
+      const semanticToken = (segment as { semanticToken?: { tokenType: string } }).semanticToken;
+      return semanticToken === undefined ? [] : [{ text: segment.text, tokenType: semanticToken.tokenType }];
+    }));
+
+    expect(renderedTokens).toEqual(expect.arrayContaining([
+      { text: 'Vec', tokenType: 'type' },
+      { text: 'with_capacity', tokenType: 'function' },
+      { text: 'len', tokenType: 'function' }
+    ]));
+  });
+
+  it('paints associated functions with the same function color as local calls', () => {
+    const text = 'fn restore() { Vec::with_capacity(entry_points.len()); }';
+    const withCapacity = text.indexOf('with_capacity');
+    const len = text.indexOf('len');
+    const source: FunctionSourceDto = {
+      text,
+      startLine: 0,
+      startCharacter: 0,
+      relationships: [],
+      semanticTokens: [
+        {
+          startOffset: withCapacity,
+          endOffset: withCapacity + 'with_capacity'.length,
+          tokenType: 'function',
+          modifiers: ['associated', 'static', 'defaultLibrary', 'library']
+        },
+        {
+          startOffset: len,
+          endOffset: len + 'len'.length,
+          tokenType: 'method',
+          modifiers: ['associated', 'defaultLibrary', 'library']
+        }
+      ]
+    };
+
+    const renderedTokens = buildSourceLines(source).flatMap(line => line.segments.flatMap(segment => {
+      const semanticToken = (segment as { semanticToken?: { tokenType: string; modifiers: readonly string[] } }).semanticToken;
+      return semanticToken === undefined ? [] : [{
+        text: segment.text,
+        tokenType: semanticToken.tokenType,
+        modifiers: semanticToken.modifiers,
+        className: semanticTokenClassName(semanticToken)
+      }];
+    }));
+
+    expect(renderedTokens).toEqual(expect.arrayContaining([
+      {
+        text: 'with_capacity',
+        tokenType: 'function',
+        modifiers: ['associated', 'static', 'defaultLibrary', 'library'],
+        className: 'source-semantic source-semantic-function source-mod-associated source-mod-static source-mod-default-library source-mod-library'
+      },
+      {
+        text: 'len',
+        tokenType: 'method',
+        modifiers: ['associated', 'defaultLibrary', 'library'],
+        className: 'source-semantic source-semantic-function source-mod-associated source-mod-default-library source-mod-library'
+      }
+    ]));
+  });
+
   it('keeps lexical macro color when rust-analyzer only marks the name unresolved', () => {
     const text = 'fn load() { ok!(fs::read_to_string("input")); }';
     const name = text.indexOf('ok');
@@ -435,6 +509,44 @@ describe('buildSourceLines', () => {
       { text: 'Some', tokenType: 'variable' }
     ]));
   });
+
+  it('colors primitive str as builtinType gold and MANIFEST_FILE as a caps constant', () => {
+    const text = 'fn restore(key: &str) { let path = cache_dir.join(MANIFEST_FILE); }';
+    const source: FunctionSourceDto = {
+      text,
+      startLine: 0,
+      startCharacter: 0,
+      relationships: [],
+      semanticTokens: [
+        {
+          startOffset: text.indexOf('str'),
+          endOffset: text.indexOf('str') + 3,
+          tokenType: 'builtinType',
+          modifiers: []
+        },
+        {
+          startOffset: text.indexOf('MANIFEST_FILE'),
+          endOffset: text.indexOf('MANIFEST_FILE') + 'MANIFEST_FILE'.length,
+          tokenType: 'variable',
+          modifiers: ['constant']
+        }
+      ]
+    };
+
+    const renderedTokens = buildSourceLines(source).flatMap(line => line.segments.flatMap(segment => {
+      const semanticToken = (segment as { semanticToken?: { tokenType: string } }).semanticToken;
+      return semanticToken === undefined ? [] : [{ text: segment.text, tokenType: semanticToken.tokenType }];
+    }));
+
+    expect(renderedTokens).toEqual(expect.arrayContaining([
+      { text: 'str', tokenType: 'builtinType' },
+      { text: 'MANIFEST_FILE', tokenType: 'const' }
+    ]));
+    expect(renderedTokens).not.toEqual(expect.arrayContaining([
+      { text: 'str', tokenType: 'type' },
+      { text: 'MANIFEST_FILE', tokenType: 'variable' }
+    ]));
+  });
 });
 
 describe('semantic token class names', () => {
@@ -445,6 +557,21 @@ describe('semantic token class names', () => {
       tokenType: 'method',
       modifiers: []
     })).toBe('source-semantic source-semantic-function');
+  });
+
+  it('keeps associated functions on the function color even with rust-analyzer static/library modifiers', () => {
+    expect(semanticTokenClassName({
+      startOffset: 0,
+      endOffset: 13,
+      tokenType: 'function',
+      modifiers: ['static', 'associated', 'defaultLibrary', 'library']
+    })).toBe('source-semantic source-semantic-function source-mod-static source-mod-associated source-mod-default-library source-mod-library');
+    expect(semanticTokenClassName({
+      startOffset: 0,
+      endOffset: 3,
+      tokenType: 'method',
+      modifiers: ['defaultLibrary']
+    })).toBe('source-semantic source-semantic-function source-mod-default-library');
   });
 
   it('paints macro bangs with the macro color and namespaces with the namespace color', () => {
@@ -482,5 +609,46 @@ describe('semantic token class names', () => {
     expect(showsGotoDefinitionUnderline('function', 'Some', false)).toBe(false);
     expect(showsGotoDefinitionUnderline('function', 'load', true)).toBe(false);
     expect(showsGotoDefinitionUnderline('variable', 'manifest', false)).toBe(true);
+  });
+});
+
+describe('hover Rust highlighting', () => {
+  it('matches VS Code hover: Option gold, generic T cyan, braces uncolored', () => {
+    const text = 'pub enum Option<T> {\n    None,\n    Some( /* ... */ ),\n}';
+    const tokens = highlightRustSegments(text, {
+      rainbowBrackets: false,
+      colorTypeParameters: true
+    }).flatMap(segment => segment.token === undefined ? [] : [{
+      text: segment.text,
+      tokenType: segment.token.tokenType
+    }]);
+
+    expect(tokens).toEqual(expect.arrayContaining([
+      { text: 'pub', tokenType: 'keyword' },
+      { text: 'enum', tokenType: 'keyword' },
+      { text: 'Option', tokenType: 'type' },
+      { text: 'T', tokenType: 'typeParameter' },
+      { text: 'None', tokenType: 'enumMember' },
+      { text: 'Some', tokenType: 'enumMember' }
+    ]));
+    expect(tokens).not.toEqual(expect.arrayContaining([
+      { text: 'T', tokenType: 'type' },
+      { text: '{', tokenType: 'bracket1' },
+      { text: '}', tokenType: 'bracket1' },
+      { text: '(', tokenType: 'bracket2' },
+      { text: '<', tokenType: 'bracket1' }
+    ]));
+  });
+
+  it('treats rust-analyzer [`Option`](url) as linked inline code, matching VS Code hover', () => {
+    expect(parseInlineMarkdown(
+      'The [`Option`](https://doc.rust-lang.org/std/option/enum.Option.html) type. See [the module level documentation](https://doc.rust-lang.org/std/option/index.html) for more.'
+    )).toEqual([
+      { kind: 'text', value: 'The ' },
+      { kind: 'codeLink', value: 'Option' },
+      { kind: 'text', value: ' type. See ' },
+      { kind: 'link', value: 'the module level documentation' },
+      { kind: 'text', value: ' for more.' }
+    ]);
   });
 });
